@@ -1,0 +1,16 @@
+# Bỏ qua file model safetensors
+text_summarization_model_1/
+
+# Các định dạng model khác có thể dùng
+*.safetensors
+*.bin
+*.pth
+*.pt
+
+# Thư mục cache/huggingface
+.cache/
+huggingface/
+
+# File checkpoint nếu có
+checkpoint/
+*.ckpt
