@@ -73,7 +73,7 @@ Mở trình duyệt và truy cập: [http://localhost:5173](http://localhost:517
 
 ## 📺 Demo
 
-![demo](http://localhost:5173/src/img/demo.png)
+![demo](https://imgur.com/byUaf7B)
 
 ## 💡 Định hướng tương lai
 
