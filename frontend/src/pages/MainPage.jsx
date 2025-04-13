@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from "../components/Header";
 import {
   Card,
@@ -30,7 +30,12 @@ const MainPage = () => {
   const [extractedText, setExtractedText] = useState("");
   const [file, setFile] = useState(null);
 
-  
+  useEffect(() => {
+    // Khi tab thay đổi, reset kết quả tóm tắt
+    setSummaryResult("");
+    setInputText("");
+    setExtractedText("");
+  }, [tabIndex]);
 
 
   const [loading, setLoading] = useState(false);
@@ -597,23 +602,35 @@ const readPDF = (file) => {
                         )}
 
 
-          {summaryResult && (
-            <Box
-              sx={{
-                mt: 4,
-                p: 2,
-                backgroundColor: '#252535',
-                borderRadius: '15px',
-                color: '#a0a0ff',
-                overflowWrap: 'break-word',
-              }}
-            >
-              <Typography variant="h6">Kết quả tóm tắt:</Typography>
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mt: 1 }}>
-                {summaryResult}
-              </Typography>
-            </Box>
-          )}
+{summaryResult && (
+                          <Box
+                            sx={{
+                              mt: 4,
+                              p: 2,
+                              backgroundColor: '#252535',
+                              borderRadius: '15px',
+                              color: '#a0a0ff',
+                              maxWidth: '100%',
+                              overflowWrap: 'break-word',
+                              position: 'relative' // Cho phép đặt icon ở góc
+                            }}
+                          >
+                            {/* Nút Copy và Xoá */}
+                            <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 1 }}>
+                              <IconButton size="small" onClick={() => navigator.clipboard.writeText(summaryResult)} color="inherit">
+                                <ContentCopy fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" onClick={() => setSummaryResult('')} color="inherit">
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            </Box>
+
+                            <Typography variant="h6">Kết quả tóm tắt:</Typography>
+                            <Typography variant="body1" sx={{ whiteSpace: 'pre-line', mt: 1 }}>
+                              {summaryResult}
+                            </Typography>
+                          </Box>
+                        )}
         </Box>
 
         )}
