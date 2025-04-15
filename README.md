@@ -48,8 +48,7 @@ cd HAUSummarize
 ### 2. Cài đặt backend
 
 ```bash
-cd backend
-pip install -r requirements.txt
+venv venv\Scripts\activate 
 python app.py
 ```
 
