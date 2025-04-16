@@ -369,14 +369,16 @@ const readPDF = (file) => {
                             sx={{
                               p: 4,
                               marginTop: 4,
-                              background: 'linear-gradient(145deg, #2e2e2e, #3e3e3e)',
+                              background: 'linear-gradient(145deg, #313131, #31313d)',
                               borderRadius: '20px',
-                              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(160, 160, 255, 0.2)',
+                              border: '1px solid rgba(160, 160, 255, 0.3)',
                               animation: 'animate__animated animate__zoomIn animate__slow',
                               transition: 'transform 0.3s ease',
                               '&:hover': {
                                 transform: 'translateY(-5px)',
-                                boxShadow: '0 12px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(160, 160, 255, 0.3)',
+                                borderColor: 'rgba(160, 160, 255, 0.7)',
+                                boxShadow: '0 0 10px rgba(160, 160, 255, 0.3)',
+                                
                               },
                             }}
                           >
@@ -539,19 +541,21 @@ const readPDF = (file) => {
           )}
                                   {!summaryResult && (
                           <Paper
-                            sx={{
-                              p: 4,
-                              marginTop: 4,
-                              background: 'linear-gradient(145deg, #2e2e2e, #3e3e3e)',
-                              borderRadius: '20px',
-                              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(160, 160, 255, 0.2)',
-                              animation: 'animate__animated animate__zoomIn animate__slow',
-                              transition: 'transform 0.3s ease',
-                              '&:hover': {
-                                transform: 'translateY(-5px)',
-                                boxShadow: '0 12px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(160, 160, 255, 0.3)',
-                              },
-                            }}
+                          sx={{
+                            p: 4,
+                            marginTop: 4,
+                            background: 'linear-gradient(145deg, #313131, #31313d)',
+                            borderRadius: '20px',
+                            border: '1px solid rgba(160, 160, 255, 0.3)',
+                            animation: 'animate__animated animate__zoomIn animate__slow',
+                            transition: 'transform 0.3s ease',
+                            '&:hover': {
+                              transform: 'translateY(-5px)',
+                              borderColor: 'rgba(160, 160, 255, 0.7)',
+                              boxShadow: '0 0 10px rgba(160, 160, 255, 0.3)',
+                              
+                            },
+                          }}
                           >
                             <Box sx={{ color: 'white', fontSize: 16, lineHeight: 2.2 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>

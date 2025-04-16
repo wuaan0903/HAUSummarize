@@ -46,6 +46,8 @@ training_args = Seq2SeqTrainingArguments(
     save_steps=100
 )
 
+
+
 # 6. Tạo DataCollator để pad dữ liệu đầu vào
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
