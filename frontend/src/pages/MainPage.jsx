@@ -12,12 +12,17 @@ import {
   InputLabel,
   FormControl,
   Alert,
+  Grid,
+  Paper,
+  Button,
+  TextField,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth";
 import "animate.css";
 import axios from "axios";
+import UploadFileIcon from "@mui/icons-material/UploadFile"
 import Logo from "../img/58cc8d39-8cc4-486d-b0de-93e451229f62.png";
 import SummarizeTextTab from "../components/SummarizeTextTab";
 import SummarizeArticleTab from "../components/SummarizeArticleTab";
