@@ -1,18 +1,112 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   TextField,
   Button,
   Typography,
   Paper,
+  CircularProgress,
+  InputAdornment,
+  Link as MuiLink,
+  Snackbar,
+  Alert,
 } from '@mui/material';
+import { Person, Email, Lock } from '@mui/icons-material';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import 'animate.css';
+import Logo from '../img/58cc8d39-8cc4-486d-b0de-93e451229f62.png';
 
 const Register = () => {
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [successOpen, setSuccessOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const validateForm = () => {
+    let isValid = true;
+    const newErrors = {
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    };
+
+    if (!username) {
+      newErrors.username = 'Vui lòng nhập tên tài khoản!';
+      isValid = false;
+    }
+
+    if (!email) {
+      newErrors.email = 'Vui lòng nhập email!';
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = 'Email không hợp lệ!';
+      isValid = false;
+    }
+
+    if (!password) {
+      newErrors.password = 'Vui lòng nhập mật khẩu!';
+      isValid = false;
+    } else if (password.length < 6) {
+      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự!';
+      isValid = false;
+    }
+
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Vui lòng xác nhận mật khẩu!';
+      isValid = false;
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Mật khẩu không khớp!';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setApiError('');
+    if (!validateForm()) return;
+
+    setLoading(true);
+    try {
+      await axios.post('http://127.0.0.1:5000/register', {
+        username,
+        email,
+        password,
+      });
+
+      // Hiển thị thông báo thành công
+      setSuccessOpen(true);
+
+      // Chuyển hướng về đăng nhập
+      setTimeout(() => navigate('/login'), 3000);
+    } catch (err) {
+      setApiError(err.response?.data?.error || 'Đã có lỗi xảy ra!');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseSuccess = () => {
+    setSuccessOpen(false);
+  };
+
   return (
     <Box
       sx={{
-        // Gradient background giống MainPage
         background: 'linear-gradient(135deg, #1e1e1e 30%, #2a2a3a 90%)',
         color: 'white',
         minHeight: '100vh',
@@ -21,7 +115,6 @@ const Register = () => {
         alignItems: 'center',
         position: 'relative',
         overflow: 'hidden',
-        // Hiệu ứng glow nền
         '&:before': {
           content: '""',
           position: 'absolute',
@@ -51,29 +144,41 @@ const Register = () => {
           },
         }}
       >
-        {/* Tiêu đề */}
-        <Typography
-          variant="h4"
-          sx={{
-            textAlign: 'center',
-            mb: 4,
-            fontFamily: '"Orbitron", sans-serif',
-            letterSpacing: '2px',
-            background: 'linear-gradient(90deg, #ffffff, #a0a0ff)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
-        >
-          Đăng Ký
-        </Typography>
+        {/* Logo và tiêu đề */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 4 }}>
+          <img src={Logo} alt="Logo" style={{ width: 40, height: 40, marginRight: 8 }} />
+          <Typography
+            variant="h4"
+            sx={{
+              fontFamily: '"Orbitron", sans-serif',
+              letterSpacing: '2px',
+              background: 'linear-gradient(90deg, #ffffff, #a0a0ff)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            HAUSummarize
+          </Typography>
+        </Box>
+
+        {/* Thông báo lỗi từ API */}
+        {apiError && (
+          <Typography color="error" sx={{ textAlign: 'center', mb: 2 }}>
+            {apiError}
+          </Typography>
+        )}
 
         {/* Form Đăng Ký */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <TextField
             fullWidth
             variant="outlined"
-            label="Họ và tên"
-            placeholder="Nhập họ và tên"
+            label="Tên tài khoản"
+            placeholder="Nhập tên tài khoản"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            error={!!errors.username}
+            helperText={errors.username}
             InputLabelProps={{
               sx: {
                 color: '#a0a0ff',
@@ -81,6 +186,11 @@ const Register = () => {
               },
             }}
             InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Person sx={{ color: '#a0a0ff' }} />
+                </InputAdornment>
+              ),
               sx: {
                 background: 'linear-gradient(145deg, #3e3e3e, #4e4e5e)',
                 color: 'white',
@@ -109,6 +219,10 @@ const Register = () => {
             variant="outlined"
             label="Email"
             placeholder="Nhập email của bạn"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={!!errors.email}
+            helperText={errors.email}
             InputLabelProps={{
               sx: {
                 color: '#a0a0ff',
@@ -116,6 +230,11 @@ const Register = () => {
               },
             }}
             InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Email sx={{ color: '#a0a0ff' }} />
+                </InputAdornment>
+              ),
               sx: {
                 background: 'linear-gradient(145deg, #3e3e3e, #4e4e5e)',
                 color: 'white',
@@ -145,6 +264,10 @@ const Register = () => {
             label="Mật khẩu"
             type="password"
             placeholder="Nhập mật khẩu"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={!!errors.password}
+            helperText={errors.password}
             InputLabelProps={{
               sx: {
                 color: '#a0a0ff',
@@ -152,6 +275,11 @@ const Register = () => {
               },
             }}
             InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Lock sx={{ color: '#a0a0ff' }} />
+                </InputAdornment>
+              ),
               sx: {
                 background: 'linear-gradient(145deg, #3e3e3e, #4e4e5e)',
                 color: 'white',
@@ -181,6 +309,10 @@ const Register = () => {
             label="Xác nhận mật khẩu"
             type="password"
             placeholder="Xác nhận mật khẩu"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            error={!!errors.confirmPassword}
+            helperText={errors.confirmPassword}
             InputLabelProps={{
               sx: {
                 color: '#a0a0ff',
@@ -188,6 +320,11 @@ const Register = () => {
               },
             }}
             InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Lock sx={{ color: '#a0a0ff' }} />
+                </InputAdornment>
+              ),
               sx: {
                 background: 'linear-gradient(145deg, #3e3e3e, #4e4e5e)',
                 color: 'white',
@@ -213,7 +350,9 @@ const Register = () => {
 
           {/* Nút Đăng Ký */}
           <Button
+            type="submit"
             variant="contained"
+            disabled={loading}
             sx={{
               color: 'white',
               background: 'linear-gradient(90deg, #a0a0ff, #6060ff)',
@@ -227,9 +366,13 @@ const Register = () => {
                 transform: 'scale(1.05)',
                 boxShadow: '0 0 25px rgba(160, 160, 255, 0.7)',
               },
+              '&:disabled': {
+                background: 'rgba(160, 160, 255, 0.5)',
+                cursor: 'not-allowed',
+              },
             }}
           >
-            Đăng Ký
+            {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Đăng Ký'}
           </Button>
 
           {/* Link đến Đăng Nhập */}
@@ -243,11 +386,39 @@ const Register = () => {
             }}
           >
             Đã có tài khoản?{' '}
-            <a href="/login" style={{ color: '#6060ff', fontWeight: 600 }}>
+            <MuiLink
+              component={Link}
+              to="/login"
+              sx={{ color: '#6060ff', fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+            >
               Đăng nhập ngay
-            </a>
+            </MuiLink>
           </Typography>
         </Box>
+
+        {/* Thông báo thành công */}
+        <Snackbar
+          open={successOpen}
+          autoHideDuration={3000}
+          onClose={handleCloseSuccess}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          sx={{ animation: 'animate__animated animate__bounceInDown' }}
+        >
+          <Alert
+            severity="success"
+            sx={{
+              background: 'linear-gradient(145deg, #2e2e2e, #3e3e3e)',
+              color: '#a0a0ff',
+              border: '1px solid rgba(160, 160, 255, 0.5)',
+              boxShadow: '0 0 15px rgba(160, 160, 255, 0.3)',
+              fontFamily: '"Roboto", sans-serif',
+              fontWeight: 600,
+              '& .MuiAlert-icon': { color: '#a0a0ff' },
+            }}
+          >
+            Đăng ký thành công! Vui lòng đăng nhập để tiếp tục!
+          </Alert>
+        </Snackbar>
       </Paper>
     </Box>
   );

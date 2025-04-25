@@ -4,8 +4,8 @@ import json
 import time
 
 BASE_URL = "https://hau.edu.vn"
-START_PAGE = 43
-END_PAGE = 48  # Đổi số trang nếu muốn crawl nhiều hơn
+START_PAGE = 1
+END_PAGE = 10  # Đổi số trang nếu muốn crawl nhiều hơn
 
 output = []
 
@@ -60,3 +60,4 @@ def crawl_articles():
 
 if __name__ == "__main__":
     crawl_articles()
+

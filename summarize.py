@@ -6,11 +6,11 @@ import os
 # Tạo client với API base của OpenRouter
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key="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"
+    api_key="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",
 )
 
 def summarize_text(text, model="openai/gpt-3.5-turbo"):
-    prompt = f"Hãy tóm tắt nội dung bài viết sau bằng tiếng Việt, ngắn gọn, súc tích, giữ nguyên thông tin quan trọng:\n\n{text}\n\nTóm tắt:"
+    prompt = f"Hãy tóm tắt nội dung bài viết sau bằng tiếng Việt,  giữ nguyên thông tin quan trọng, độ dài ít nhất bằng 1/3 bài viết gốc:\n\n{text}\n\nTóm tắt:"
     try:
         response = client.chat.completions.create(
             model=model,
@@ -34,8 +34,8 @@ def summarize_text(text, model="openai/gpt-3.5-turbo"):
         return None
 
 # Đường dẫn file
-input_path = "data_testing/input_articles.json"
-output_path = "data_testing/test_dataset.json"
+input_path = "data/input_articles_2.json"
+output_path = "data/train_dataset1.json"
 
 # Chạy 10 lần
 for run in range(2):

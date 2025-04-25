@@ -5,7 +5,7 @@ from rouge_score import rouge_scorer
 import json
 
 # 1. Load model và tokenizer đã train xong
-model_path = "./text_summarization_model_1"
+model_path = "wuaan0903/HAUSummarize"
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
 
@@ -39,15 +39,45 @@ for i, item in enumerate(test_dataset):
 print("✅ Đang tính ROUGE score...")
 scorer = rouge_scorer.RougeScorer(["rouge1", "rouge2", "rougeL"], use_stemmer=True)
 
-rouge1_list, rouge2_list, rougeL_list = [], [], []
+rouge1_p, rouge1_r, rouge1_f = [], [], []
+rouge2_p, rouge2_r, rouge2_f = [], [], []
+rougeL_p, rougeL_r, rougeL_f = [], [], []
+
 for pred, ref in zip(generated_summaries, test_dataset["summary"]):
     scores = scorer.score(ref, pred)
-    rouge1_list.append(scores["rouge1"].fmeasure)
-    rouge2_list.append(scores["rouge2"].fmeasure)
-    rougeL_list.append(scores["rougeL"].fmeasure)
+
+    rouge1_p.append(scores["rouge1"].precision)
+    rouge1_r.append(scores["rouge1"].recall)
+    rouge1_f.append(scores["rouge1"].fmeasure)
+
+    rouge2_p.append(scores["rouge2"].precision)
+    rouge2_r.append(scores["rouge2"].recall)
+    rouge2_f.append(scores["rouge2"].fmeasure)
+
+    rougeL_p.append(scores["rougeL"].precision)
+    rougeL_r.append(scores["rougeL"].recall)
+    rougeL_f.append(scores["rougeL"].fmeasure)
+
 
 # 6. In kết quả trung bình
-print("\n📊 Kết quả đánh giá ROUGE:")
-print(f"ROUGE-1: {sum(rouge1_list)/len(rouge1_list):.4f}")
-print(f"ROUGE-2: {sum(rouge2_list)/len(rouge2_list):.4f}")
-print(f"ROUGE-L: {sum(rougeL_list)/len(rougeL_list):.4f}")
+print("\n📊 KẾT QUẢ ĐÁNH GIÁ ROUGE:")
+print("== ROUGE-1 ==")
+print(f"Precision: {sum(rouge1_p)/len(rouge1_p):.4f}")
+print(f"Recall:    {sum(rouge1_r)/len(rouge1_r):.4f}")
+print(f"F1-Score:  {sum(rouge1_f)/len(rouge1_f):.4f}")
+
+print("\n== ROUGE-2 ==")
+print(f"Precision: {sum(rouge2_p)/len(rouge2_p):.4f}")
+print(f"Recall:    {sum(rouge2_r)/len(rouge2_r):.4f}")
+print(f"F1-Score:  {sum(rouge2_f)/len(rouge2_f):.4f}")
+
+print("\n== ROUGE-L ==")
+print(f"Precision: {sum(rougeL_p)/len(rougeL_p):.4f}")
+print(f"Recall:    {sum(rougeL_r)/len(rougeL_r):.4f}")
+print(f"F1-Score:  {sum(rougeL_f)/len(rougeL_f):.4f}")
+
+
+
+
+
+
