@@ -2,30 +2,26 @@ import React, { useState, useEffect } from "react";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
 import {
-  Card,
   Box,
   Tabs,
   Tab,
-  TextField,
-  Button,
   Typography,
-  Grid,
-  Paper,
-  CircularProgress,
   IconButton,
   MenuItem,
   Select,
   InputLabel,
   FormControl,
+  Alert,
 } from "@mui/material";
-import Delete from "@mui/icons-material/Delete";
-import ContentCopy from "@mui/icons-material/ContentCopy";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
+import CloseIcon from "@mui/icons-material/Close";
 import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth";
 import "animate.css";
 import axios from "axios";
 import Logo from "../img/58cc8d39-8cc4-486d-b0de-93e451229f62.png";
+import SummarizeTextTab from "../components/SummarizeTextTab";
+import SummarizeArticleTab from "../components/SummarizeArticleTab";
+import SummarizeVideoTab from "../components/SummarizeVideoTab";
 
 const MainPage = () => {
   const [tabIndex, setTabIndex] = useState(0);
@@ -36,25 +32,28 @@ const MainPage = () => {
   const [loading, setLoading] = useState(false);
   const [summaryType, setSummaryType] = useState("short"); // Giá trị mặc định là "short"
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null); // State mới
+  const [alerts, setAlerts] = useState([]);
   const userDataString = localStorage.getItem("userData");
   const userData = userDataString ? JSON.parse(userDataString) : null;
 
   useEffect(() => {
-    // Reset state khi đổi tab
     setSummaryResult("");
     setInputText("");
     setExtractedText("");
-
-    // Bind dữ liệu nếu có selectedHistoryItem
-    if (selectedHistoryItem) {
-      setInputText(selectedHistoryItem.content);
-      setSummaryResult(selectedHistoryItem.summary);
-      setSelectedHistoryItem(null); // Xóa sau khi bind
-    }
   }, [tabIndex]);
 
-  // Hàm mở/đóng Sidebar
+  const addAlert = (message, severity) => {
+    const id = Date.now();
+    setAlerts((prev) => [...prev, { id, message, severity }]);
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((alert) => alert.id !== id));
+    }, 6000);
+  };
+
+  const removeAlert = (id) => {
+    setAlerts((prev) => prev.filter((alert) => alert.id !== id));
+  };
+
   const handleOpenSidebar = () => {
     setSidebarOpen(true);
   };
@@ -63,14 +62,13 @@ const MainPage = () => {
     setSidebarOpen(false);
   };
 
-  // Xử lý chọn lịch sử từ Sidebar
   const handleSelectHistory = (item) => {
-    setSelectedHistoryItem(item); // Lưu item tạm thời
-    setTabIndex(0); // Chuyển về tab "Tóm tắt văn bản"
-    setSidebarOpen(false); // Đóng Sidebar
+    setInputText(item.content);
+    setSummaryResult(item.summary);
+    setTabIndex(0);
+    setSidebarOpen(false);
   };
 
-  // Xử lý khi tải lên file
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -83,12 +81,11 @@ const MainPage = () => {
       ) {
         readWord(file);
       } else {
-        alert("Vui lòng tải lên tệp PDF hoặc Word.");
+        addAlert("Vui lòng tải lên tệp PDF hoặc Word.", "error");
       }
     }
   };
 
-  // Đọc nội dung file PDF
   const readPDF = (file) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -114,13 +111,13 @@ const MainPage = () => {
 
         Promise.all(pagePromises).then(() => {
           setInputText(text);
+          addAlert("Đã tải nội dung từ file PDF.", "success");
         });
       });
     };
     reader.readAsArrayBuffer(file);
   };
 
-  // Đọc nội dung file Word
   const readWord = (file) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -129,27 +126,45 @@ const MainPage = () => {
         .extractRawText({ arrayBuffer })
         .then((result) => {
           setInputText(result.value);
+          addAlert("Đã tải nội dung từ file Word.", "success");
         })
         .catch((err) => {
           console.error("Error reading Word file:", err);
+          addAlert("Lỗi khi đọc file Word.", "error");
         });
     };
     reader.readAsArrayBuffer(file);
   };
 
-  // Tóm tắt văn bản
-  const handleSummarize = async () => {
-    if (!inputText.trim()) {
-      alert("Vui lòng nhập văn bản cần tóm tắt!");
+const handleSummarize = async (summaryType) => {
+  if (!inputText.trim()) {
+    addAlert("Vui lòng nhập văn bản cần tóm tắt!", "warning");
+    return;
+  }
+
+  // Ước lượng số token: 1 từ ~0.75 token, 340 từ ~1024 token
+  const wordCount = inputText.split(/\s+/).length;
+  const isLongText = wordCount > 340; // ~1024 token
+
+  if (isLongText) {
+    const confirmUseCoin = window.confirm(
+      "Văn bản quá dài! Bạn có muốn sử dụng 1 xu để tóm tắt không?"
+    );
+    if (!confirmUseCoin) {
+      addAlert("Đã hủy tóm tắt.", "info");
       return;
     }
+    if (!userData) {
+      addAlert("Vui lòng đăng nhập để tóm tắt văn bản dài!", "warning");
+      return;
+    }
+  }
 
     try {
       setLoading(true);
       const response = await axios.post("http://localhost:5000/api/summarize", {
         user_id: userData?.userId ?? null,
         text: inputText,
-        summary_type: summaryType,
       });
       setSummaryResult(response.data.summary);
     } catch (error) {
@@ -160,8 +175,11 @@ const MainPage = () => {
     }
   };
 
-  // Tóm tắt bài viết từ URL
   const handleSummarizePost = async () => {
+    if (!inputText.trim()) {
+      addAlert("Vui lòng nhập link bài viết để tóm tắt", "warning");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("http://localhost:5000/api/summarize-article", {
@@ -182,9 +200,11 @@ const MainPage = () => {
         setExtractedText(data.full_text);
       } else {
         setSummaryResult("Không thể tóm tắt nội dung từ liên kết này.");
+        addAlert("Không thể tóm tắt nội dung từ liên kết này.", "error");
       }
     } catch (error) {
       setSummaryResult("Đã có lỗi xảy ra khi xử lý.");
+      addAlert("Đã có lỗi xảy ra khi xử lý.", "error");
     } finally {
       setLoading(false);
     }
@@ -217,6 +237,54 @@ const MainPage = () => {
         onClose={handleCloseSidebar}
         onSelectHistory={handleSelectHistory}
       />
+
+      {/* Alerts */}
+      <Box
+        sx={{
+          position: "fixed",
+          top: 16,
+          right: 16,
+          zIndex: 1300,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          maxWidth: "400px",
+        }}
+      >
+        {alerts.map((alert) => (
+          <Alert
+            key={alert.id}
+            severity={alert.severity}
+            onClose={() => removeAlert(alert.id)}
+            className="animate__animated animate__fadeInRight animate__faster"
+            sx={{
+              background: "linear-gradient(90deg, #6060ff, #a0a0ff)",
+              color: "#ffffff",
+              borderRadius: "10px",
+              boxShadow: "0 0 15px rgba(160, 160, 255, 0.5)",
+              fontFamily: '"Roboto", sans-serif',
+              "& .MuiAlert-icon": {
+                color: "#ffffff",
+              },
+              "& .MuiAlert-action": {
+                color: "#ffffff",
+              },
+            }}
+            action={
+              <IconButton
+                aria-label="close"
+                color="inherit"
+                size="small"
+                onClick={() => removeAlert(alert.id)}
+              >
+                <CloseIcon fontSize="inherit" />
+              </IconButton>
+            }
+          >
+            {alert.message}
+          </Alert>
+        ))}
+      </Box>
 
       <Box
         sx={{
@@ -862,16 +930,7 @@ const MainPage = () => {
           </Box>
         )}
 
-        {tabIndex === 2 && (
-          <Box>
-            <Typography variant="h6" sx={{ color: "#a0a0ff", mb: 2 }}>
-              Tóm tắt video YouTube
-            </Typography>
-            <Typography variant="body1" sx={{ color: "#ccc" }}>
-              Chức năng này đang được phát triển...
-            </Typography>
-          </Box>
-        )}
+        {tabIndex === 2 && <SummarizeVideoTab />}
       </Box>
     </Box>
   );

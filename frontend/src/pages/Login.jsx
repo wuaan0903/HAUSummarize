@@ -55,7 +55,6 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // Gọi API đăng nhập
       const response = await axios.post('http://127.0.0.1:5000/login', {
         username,
         password,
@@ -63,31 +62,24 @@ const Login = () => {
 
       console.log('API response:', response);
 
-      // Kiểm tra mã status
       if (response.status !== 200) {
         throw new Error('Phản hồi từ API không thành công!');
       }
 
-      // Kiểm tra dữ liệu trả về
-      const { access_token, userId, username: responseUsername } = response.data;
+      const { access_token, userId, coin, username: responseUsername } = response.data;
       if (!access_token || !userId || !responseUsername) {
         throw new Error('Dữ liệu trả về không đầy đủ!');
       }
 
-      // Lưu userData vào localStorage
       try {
-        const userData = { access_token, userId, username: responseUsername };
+        const userData = { access_token, userId, username: responseUsername, coin };
         localStorage.setItem('userData', JSON.stringify(userData));
         console.log('userData saved:', userData);
       } catch (storageError) {
         console.error('Storage error:', storageError);
         throw new Error('Không thể lưu dữ liệu đăng nhập!');
       }
-
-      // Hiển thị thông báo thành công
       setSuccessOpen(true);
-
-      // Chuyển hướng sau khi thông báo hiển thị
       setTimeout(() => {
         console.log('Navigating to /');
         navigate('/main');
@@ -148,7 +140,6 @@ const Login = () => {
           },
         }}
       >
-        {/* Logo và tiêu đề */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 4 }}>
           <img src={Logo} alt="Logo" style={{ width: 40, height: 40, marginRight: 8 }} />
           <Typography
@@ -164,15 +155,11 @@ const Login = () => {
             HAUSummarize
           </Typography>
         </Box>
-
-        {/* Thông báo lỗi từ API */}
         {apiError && (
           <Typography color="error" sx={{ textAlign: 'center', mb: 2 }}>
             {apiError}
           </Typography>
         )}
-
-        {/* Form Đăng Nhập */}
         <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <TextField
             fullWidth
@@ -263,7 +250,6 @@ const Login = () => {
             }}
           />
 
-          {/* Link Quên mật khẩu */}
           <MuiLink
             component={Link}
             to="/forgot-password"
@@ -278,7 +264,6 @@ const Login = () => {
             Quên mật khẩu?
           </MuiLink>
 
-          {/* Nút Đăng Nhập */}
           <Button
             type="submit"
             variant="contained"
@@ -305,7 +290,6 @@ const Login = () => {
             {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Đăng Nhập'}
           </Button>
 
-          {/* Link đến Đăng Ký */}
           <Typography
             variant="body2"
             sx={{
@@ -326,8 +310,7 @@ const Login = () => {
           </Typography>
         </Box>
       </Paper>
-
-      {/* Thông báo thành công */}
+      
       <Snackbar
         open={successOpen}
         autoHideDuration={3000}

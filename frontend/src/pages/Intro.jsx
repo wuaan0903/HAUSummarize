@@ -64,7 +64,7 @@ const Intro = () => {
                 px: 5,
                 py: 1.5,
                 fontWeight: 600,
-                fontSize: '1.5rem',
+                fontSize: '1.4rem',
                 transition: 'all 0.4s ease',
                 '&:hover': {
                   backgroundColor: 'white',
