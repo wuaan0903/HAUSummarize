@@ -9,6 +9,12 @@ import {
   Divider,
   CircularProgress,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
@@ -18,14 +24,16 @@ const Sidebar = ({ open, onClose, onSelectHistory }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedHistoryId, setSelectedHistoryId] = useState(null);
 
   // Lấy user_id từ localStorage
   const userDataString = localStorage.getItem('userData');
   const userData = userDataString ? JSON.parse(userDataString) : null;
   const userId = userData?.userId;
 
-  // Hàm gọi API GET /history
   const fetchHistory = async () => {
+    if (!userId) return;
     setLoading(true);
     setError(null);
     try {
@@ -41,7 +49,6 @@ const Sidebar = ({ open, onClose, onSelectHistory }) => {
     }
   };
 
-  // Gọi API khi Sidebar mở và có userId
   useEffect(() => {
     if (open && userId) {
       fetchHistory();
@@ -51,21 +58,30 @@ const Sidebar = ({ open, onClose, onSelectHistory }) => {
     }
   }, [open, userId]);
 
-  // Hàm xóa lịch sử
-  const handleDeleteHistory = async (historyId) => {
-    // Hiển thị hộp thoại xác nhận
-    const confirmDelete = window.confirm('Bạn có chắc muốn xóa lịch sử này không?');
-    if (!confirmDelete) return;
+  // Mở Dialog xác nhận xóa
+  const handleOpenDialog = (historyId) => {
+    setSelectedHistoryId(historyId);
+    setOpenDialog(true);
+  };
+
+  // Đóng Dialog
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setSelectedHistoryId(null);
+  };
+  const handleDeleteHistory = async () => {
+    if (!selectedHistoryId) return;
 
     setLoading(true);
     try {
-      await axios.delete(`http://127.0.0.1:5000/history/${historyId}`);
-      await fetchHistory(); // Refresh danh sách
+      await axios.delete(`http://127.0.0.1:5000/history/${selectedHistoryId}`);
+      await fetchHistory();
     } catch (err) {
       console.error('Lỗi khi xóa lịch sử:', err);
       setError('Không thể xóa lịch sử.');
     } finally {
       setLoading(false);
+      handleCloseDialog();
     }
   };
 
@@ -138,8 +154,8 @@ const Sidebar = ({ open, onClose, onSelectHistory }) => {
                   },
                 }}
                 onClick={() => {
-                  onSelectHistory(item); // Gọi callback để bind dữ liệu
-                  onClose(); // Đóng Sidebar
+                  onSelectHistory(item);
+                  onClose();
                 }}
               >
                 <ListItemText
@@ -171,7 +187,7 @@ const Sidebar = ({ open, onClose, onSelectHistory }) => {
                   size="small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDeleteHistory(item.id);
+                    handleOpenDialog(item.id);
                   }}
                   sx={{
                     position: 'absolute',
@@ -193,6 +209,43 @@ const Sidebar = ({ open, onClose, onSelectHistory }) => {
           </List>
         )}
       </Box>
+
+      {/* Dialog xác nhận xóa */}
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+        sx={{
+          '& .MuiDialog-paper': {
+            background: 'linear-gradient(145deg, #2e2e2e, #3e3e3e)',
+            color: 'white',
+            border: '1px solid rgba(160, 160, 255, 0.3)',
+          },
+        }}
+      >
+        <DialogTitle id="alert-dialog-title">Xác nhận xóa</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description" sx={{ color: '#ccc' }}>
+            Bạn có chắc muốn xóa lịch sử này không? Hành động này không thể hoàn tác.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCloseDialog}
+            sx={{ color: '#a0a0ff' }}
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleDeleteHistory}
+            sx={{ color: '#ff8080' }}
+            autoFocus
+          >
+            Xóa
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Drawer>
   );
 };

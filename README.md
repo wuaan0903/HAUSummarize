@@ -48,7 +48,7 @@ cd HAUSummarize
 ### 2. Cài đặt backend
 
 ```bash
-venv venv\Scripts\activate 
+venv venv\Scripts\activate
 python app.py
 ```
 
