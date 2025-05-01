@@ -18,7 +18,12 @@ import {
   TextField,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import * as pdfjsLib from "pdfjs-dist";
+import * as pdfjsLib from 'pdfjs-dist';
+import { GlobalWorkerOptions } from 'pdfjs-dist/build/pdf';
+import workerURL from 'pdfjs-dist/build/pdf.worker.js?url';
+
+GlobalWorkerOptions.workerSrc = workerURL;
+
 import mammoth from "mammoth";
 import "animate.css";
 import axios from "axios";
@@ -93,35 +98,37 @@ const MainPage = () => {
 
   const readPDF = (file) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const pdfData = new Uint8Array(event.target.result);
-      pdfjsLib.getDocument(pdfData).promise.then((pdf) => {
-        let text = "";
-        const numPages = pdf.numPages;
-
-        const extractPageText = (pageNum) => {
-          return pdf.getPage(pageNum).then((page) => {
-            return page.getTextContent().then((textContent) => {
-              textContent.items.forEach((item) => {
-                text += item.str + " ";
-              });
-            });
+    reader.onload = function (event) {
+      const typedArray = new Uint8Array(reader.result);
+  
+      pdfjsLib.getDocument(typedArray).promise
+        .then((pdf) => {
+          const pagesPromises = [];
+  
+          for (let i = 1; i <= pdf.numPages; i++) {
+            pagesPromises.push(
+              pdf.getPage(i).then((page) =>
+                page.getTextContent().then((content) => {
+                  return content.items.map((item) => item.str).join(" ");
+                })
+              )
+            );
+          }
+  
+          Promise.all(pagesPromises).then((pagesText) => {
+            const fullText = pagesText.join("\n");
+            setInputText(fullText); // ✅ dùng state React thay vì document.getElementById
           });
-        };
-
-        const pagePromises = [];
-        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-          pagePromises.push(extractPageText(pageNum));
-        }
-
-        Promise.all(pagePromises).then(() => {
-          setInputText(text);
-          addAlert("Đã tải nội dung từ file PDF.", "success");
+        })
+        .catch((error) => {
+          addAlert("Không thể đọc file PDF!", "error");
+          console.error(error);
         });
-      });
     };
+  
     reader.readAsArrayBuffer(file);
   };
+  
 
   const readWord = (file) => {
     const reader = new FileReader();
@@ -130,7 +137,15 @@ const MainPage = () => {
       mammoth
         .extractRawText({ arrayBuffer })
         .then((result) => {
-          setInputText(result.value);
+          let text = result.value;
+        
+          // Xử lý: loại bỏ nhiều dòng trống liên tiếp thành 1
+          text = text.replace(/\n\s*\n+/g, '\n\n');
+        
+          // Loại bỏ dòng trống đầu và cuối
+          text = text.trim();
+        
+          setInputText(text);
           addAlert("Đã tải nội dung từ file Word.", "success");
         })
         .catch((err) => {
@@ -165,22 +180,45 @@ const handleSummarize = async (summaryType) => {
     }
   }
 
-    try {
-      setLoading(true);
-      const response = await axios.post("http://localhost:5000/api/summarize", {
-        user_id: userData?.userId ?? null,
-        text: inputText,
-      });
-      setSummaryResult(response.data.summary);
-    } catch (error) {
-      console.error("Lỗi khi gọi API tóm tắt:", error);
-      alert("Đã có lỗi xảy ra khi gọi API.");
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+    const response = await axios.post("http://localhost:5000/api/summarize", {
+      user_id: userData?.userId ?? null, // Gửi null cho văn bản ngắn
+      text: inputText,
+      summary_type: summaryType,
+    });
+    setSummaryResult(response.data.summary);
+    setExtractedText(response.data.full_text);
+    if (response.data.coin !== undefined) {
+      // Cập nhật coin nếu user đăng nhập và trừ coin
+      const updatedUserData = { ...userData, coin: response.data.coin };
+      localStorage.setItem("userData", JSON.stringify(updatedUserData));
+      addAlert(
+        `Tóm tắt thành công! Đã sử dụng 1 xu. Còn lại: ${response.data.coin} xu.`,
+        "success"
+      );
+    } else {
+      addAlert("Tóm tắt thành công!", "success");
     }
-  };
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.data?.error) {
+      const errorMsg = error.response.data.error;
+      if (errorMsg.includes("Không đủ coin")) {
+        addAlert("Không đủ xu để tóm tắt! Vui lòng nạp thêm xu.", "error");
+      } else if (errorMsg.includes("Cần đăng nhập")) {
+        addAlert("Vui lòng đăng nhập để tóm tắt văn bản dài!", "error");
+      } else {
+        addAlert(errorMsg, "error");
+      }
+    } else {
+      addAlert("Đã có lỗi xảy ra, xin vui lòng thử lại sau.", "error");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleSummarizePost = async () => {
+  const handleSummarizePost = async (summaryType) => {
     if (!inputText.trim()) {
       addAlert("Vui lòng nhập link bài viết để tóm tắt", "warning");
       return;
@@ -393,276 +431,16 @@ const handleSummarize = async (summaryType) => {
         </Tabs>
 
         {tabIndex === 0 && (
-          <Box>
-            <Box
-              className="animate__animated animate__zoomIn animate__faster"
-              sx={{ display: "flex", justifyContent: "center" }}
-            >
-              <Grid container spacing={4} sx={{ px: 2 }}>
-                <Grid item xs={12} md={12} width="800px">
-                  <Paper
-                    sx={{
-                      p: 3,
-                      maxWidth: "800px",
-                      width: "100%",
-                      mx: "auto",
-                      background: "linear-gradient(145deg, #2e2e2e, #3e3e3e)",
-                      borderRadius: "20px",
-                      boxShadow:
-                        "0 8px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(160, 160, 255, 0.2)",
-                      animation:
-                        "animate__animated animate__fadeInUp animate__slow",
-                      transition: "transform 0.3s ease",
-                      "&:hover": {
-                        transform: "translateY(-5px)",
-                        boxShadow:
-                          "0 12px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(160, 160, 255, 0.3)",
-                      },
-                    }}
-                  >
-                    <Button
-                      variant="outlined"
-                      startIcon={<UploadFileIcon />}
-                      sx={{
-                        mb: 2,
-                        color: "#a0a0ff",
-                        borderColor: "#a0a0ff",
-                        backgroundColor: "transparent",
-                        fontWeight: 600,
-                        borderRadius: "10px",
-                        padding: "8px 16px",
-                        transition: "all 0.3s ease",
-                        "&:hover": {
-                          color: "#ffffff",
-                          borderColor: "#ffffff",
-                          backgroundColor: "rgba(160, 160, 255, 0.2)",
-                          boxShadow: "0 0 15px rgba(160, 160, 255, 0.5)",
-                          transform: "scale(1.05)",
-                        },
-                      }}
-                    >
-                      Upload Doc
-                      <input
-                        type="file"
-                        accept=".pdf, .docx"
-                        style={{ opacity: 0, position: "absolute" }}
-                        onChange={handleFileChange}
-                      />
-                    </Button>
-
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={8}
-                      variant="outlined"
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      placeholder="Copy và dán văn bản cần tóm tắt vào ô này"
-                      InputProps={{
-                        sx: {
-                          background:
-                            "linear-gradient(145deg, #3e3e3e, #4e4e5e)",
-                          color: "white",
-                          borderRadius: "15px",
-                          padding: "10px",
-                          border: "1px solid rgba(160, 160, 255, 0.3)",
-                          transition: "all 0.3s ease",
-                          "&:hover": {
-                            borderColor: "rgba(160, 160, 255, 0.7)",
-                            boxShadow: "0 0 10px rgba(160, 160, 255, 0.3)",
-                          },
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            border: "none",
-                          },
-                        },
-                      }}
-                    />
-
-                    <Box
-                      sx={{
-                        mt: 3,
-                        display: "flex",
-                        gap: 2,
-                        flexWrap: "wrap",
-                        justifyContent: "space-between",
-                      }}
-                    >
-
-                  <FormControl sx={{ minWidth: 200 }}>
-                          <InputLabel id="summary-type-label" sx={{ fontWeight: 600 , color: "white"}}>Chọn loại tóm tắt</InputLabel>
-                          <Select
-                            labelId="summary-type-label"
-                            id="summary-type"
-                            value={summaryType}
-                            label="Chọn loại tóm tắt"
-                            onChange={(e) => setSummaryType(e.target.value)}
-                            sx={{
-                              border: "2px solid rgba(160, 160, 255, 0.3)",
-                              borderColor: "rgba(160, 160, 255, 0.3)",
-                              
-                              color: "white",
-                              borderRadius: "25px",
-                              fontWeight: 500,
-                              paddingLeft: "10px",
-                              paddingRight: "10px",
-                              transition: "all 0.3s ease",
-                              "& .MuiSelect-icon": {
-                                color: "white", // Đổi màu cho icon dropdown
-                              },
-                              "&:hover": {
-                                borderColor: "rgba(160, 160, 255, 0.7)",
-                                boxShadow: "0 0 15px rgba(160, 160, 255, 0.5)",
-                              },
-                            }}
-                          >
-                            <MenuItem value="short" sx={{ fontWeight: 600 , px:5,py:1.5 }}>Tóm tắt ngắn gọn</MenuItem>
-                            <MenuItem value="medium" sx={{ fontWeight: 600 , px:5,py:1.5 }}>Tóm tắt vừa phải</MenuItem>
-                            <MenuItem value="detailed" sx={{ fontWeight: 600 , px:5,py:1.5 }}>Tóm tắt chi tiết</MenuItem>
-                          </Select>
-                        </FormControl>
-                      <Button
-                        variant="contained"
-                        onClick={handleSummarize}
-                        disabled={loading}
-                        sx={{
-                          color: "white",
-                          background:
-                            "linear-gradient(90deg, #a0a0ff, #6060ff)",
-                          fontWeight: 600,
-                          px: 6,
-                          py: 1.5,
-                          borderRadius: "35px",
-                          boxShadow: "0 0 15px rgba(160, 160, 255, 0.5)",
-                          transition: "all 0.3s ease",
-                          "&:hover": {
-                            background:
-                              "linear-gradient(90deg, #6060ff, #a0a0ff)",
-                            transform: "scale(1.05)",
-                            boxShadow: "0 0 25px rgba(160, 160, 255, 0.7)",
-                          },
-                        }}
-                      >
-                        {loading ? (
-                          <CircularProgress size={24} sx={{ color: "white" }} />
-                        ) : (
-                          "Tóm Tắt →"
-                        )}
-                      </Button>
-                    </Box>
-
-                    {!summaryResult && (
-                      <Paper
-                        sx={{
-                          p: 4,
-                          marginTop: 4,
-                          background:
-                            "linear-gradient(145deg, #2e2e2e, #3e3e3e)",
-                          borderRadius: "20px",
-                          boxShadow:
-                            "0 8px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(160, 160, 255, 0.2)",
-                          animation:
-                            "animate__animated animate__zoomIn animate__slow",
-                          transition: "transform 0.3s ease",
-                          "&:hover": {
-                            transform: "translateY(-5px)",
-                            boxShadow:
-                              "0 12px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(160, 160, 255, 0.3)",
-                          },
-                        }}
-                      >
-                        <Box
-                          sx={{ color: "white", fontSize: 16, lineHeight: 2.2 }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              mb: 2,
-                            }}
-                          >
-                            <Typography
-                              fontWeight={600}
-                              color="#a0a0ff"
-                              component="span"
-                              sx={{ mr: 1 }}
-                            >
-                              01.
-                            </Typography>
-                            <Typography>
-                              Nhập dữ liệu hoặc dán dữ liệu vào ô bên trái
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: "flex", alignItems: "center" }}>
-                            <Typography
-                              fontWeight={600}
-                              color="#a0a0ff"
-                              component="span"
-                              sx={{ mr: 1 }}
-                            >
-                              02.
-                            </Typography>
-                            <Typography>
-                              Bấm nút <b>Tóm Tắt</b> và tận hưởng kết quả
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Paper>
-                    )}
-
-                    {summaryResult && (
-                      <Box
-                        sx={{
-                          mt: 4,
-                          p: 2,
-                          backgroundColor: "#252535",
-                          borderRadius: "15px",
-                          color: "#a0a0ff",
-                          maxWidth: "100%",
-                          overflowWrap: "break-word",
-                          position: "relative",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            position: "absolute",
-                            top: 8,
-                            right: 8,
-                            display: "flex",
-                            gap: 1,
-                          }}
-                        >
-                          <IconButton
-                            size="small"
-                            onClick={() =>
-                              navigator.clipboard.writeText(summaryResult)
-                            }
-                            color="inherit"
-                          >
-                            <ContentCopy fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => setSummaryResult("")}
-                            color="inherit"
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Box>
-
-                        <Typography variant="h6">Kết quả tóm tắt:</Typography>
-                        <Typography
-                          variant="body1"
-                          sx={{ whiteSpace: "pre-line", mt: 1 }}
-                        >
-                          {summaryResult}
-                        </Typography>
-                      </Box>
-                    )}
-                  </Paper>
-                </Grid>
-              </Grid>
-            </Box>
-          </Box>
+          <SummarizeTextTab
+            inputText={inputText}
+            setInputText={setInputText}
+            summaryResult={summaryResult}
+            setSummaryResult={setSummaryResult}
+            extractedText={extractedText}
+            handleSummarize={handleSummarize}
+            handleFileChange={handleFileChange}
+            loading={loading}
+          />
         )}
 
         {tabIndex === 1 && (

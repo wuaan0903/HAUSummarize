@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   Paper,
@@ -7,6 +7,10 @@ import {
   Typography,
   CircularProgress,
   IconButton,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import Delete from "@mui/icons-material/Delete";
@@ -20,6 +24,16 @@ const SummarizeArticleTab = ({
   handleSummarizePost,
   loading,
 }) => {
+    const [summaryType, setSummaryType] = useState("short");
+    const userData = JSON.parse(localStorage.getItem('userData')) || {};
+    const coin = userData.coin || 0;
+    const handleSummaryTypeChange = (event) => {
+      setSummaryType(event.target.value);
+    };
+  
+    const handleSummarizeClick = () => {
+      handleSummarizePost(summaryType);
+    };
   return (
     <Box
       className="animate__animated animate__fadeInUp animate__faster"
@@ -68,34 +82,78 @@ const SummarizeArticleTab = ({
         }}
       />
 
-      <Box sx={{ mt: 3, display: "flex", justifyContent: "center" }}>
-        <Button
-          variant="contained"
-          onClick={handleSummarizePost}
-          disabled={loading}
-          sx={{
-            color: "white",
-            background: "linear-gradient(90deg, #a0a0ff, #6060ff)",
-            fontWeight: 600,
-            px: 5,
-            py: 1.5,
-            borderRadius: "25px",
-            boxShadow: "0 0 15px rgba(160, 160, 255, 0.5)",
-            transition: "all 0.3s ease",
-            "&:hover": {
-              background: "linear-gradient(90deg, #6060ff, #a0a0ff)",
-              transform: "scale(1.05)",
-              boxShadow: "0 0 25px rgba(160, 160, 255, 0.7)",
-            },
-          }}
-        >
-          {loading ? (
-            <CircularProgress size={24} sx={{ color: "white" }} />
-          ) : (
-            "Tóm Tắt →"
-          )}
-        </Button>
-      </Box>
+<Box
+                sx={{
+                  mt: 2,
+                  display: "flex",
+                  gap: 2,
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel
+                    sx={{ color: "#a0a0ff", "&.Mui-focused": { color: "#ffffff" } }}
+                  >
+                    Kiểu tóm tắt
+                  </InputLabel>
+                  <Select
+                    value={summaryType}
+                    onChange={handleSummaryTypeChange}
+                    label="Kiểu tóm tắt"
+                    sx={{
+                      background: "linear-gradient(145deg, #3e3e3e, #4e4e5e)",
+                      color: "white",
+                      borderRadius: "10px",
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        border: "1px solid rgba(160, 160, 255, 0.3)",
+                      },
+                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "rgba(160, 160, 255, 0.7)",
+                      },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#a0a0ff",
+                      },
+                      "& .MuiSvgIcon-root": {
+                        color: "#a0a0ff",
+                      },
+                    }}
+                  >
+                    <MenuItem value="short">Tóm tắt ngắn gọn</MenuItem>
+                    <MenuItem value="medium">Tóm tắt vừa phải</MenuItem>
+                    <MenuItem value="detailed">Tóm tắt chi tiết</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <Button
+                  variant="contained"
+                  onClick={handleSummarizeClick}
+                  disabled={loading}
+                  sx={{
+                    color: "white",
+                    background: "linear-gradient(90deg, #a0a0ff, #6060ff)",
+                    fontWeight: 600,
+                    px: 5,
+                    py: 1.5,
+                    borderRadius: "25px",
+                    boxShadow: "0 0 15px rgba(160, 160, 255, 0.5)",
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      background: "linear-gradient(90deg, #6060ff, #a0a0ff)",
+                      transform: "scale(1.05)",
+                      boxShadow: "0 0 25px rgba(160, 160, 255, 0.7)",
+                    },
+                  }}
+                >
+                  {loading ? (
+                    <CircularProgress size={24} sx={{ color: "white" }} />
+                  ) : (
+                    "Tóm Tắt →"
+                  )}
+                </Button>
+              </Box>
+
 
       {extractedText && (
         <Box
@@ -111,7 +169,7 @@ const SummarizeArticleTab = ({
           <Typography variant="h6" sx={{ color: "#a0a0ff" }}>
             Văn bản gốc:
           </Typography>
-          <Typography variant="body2" sx={{ whiteSpace: "pre-line", mt: 1 }}>
+          <Typography variant="body1" sx={{ whiteSpace: "pre-line", mt: 1 }}>
             {extractedText}
           </Typography>
         </Box>

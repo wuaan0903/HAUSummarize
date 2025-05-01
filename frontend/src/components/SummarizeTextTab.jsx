@@ -22,12 +22,13 @@ const SummarizeTextTab = ({
   inputText,
   setInputText,
   summaryResult,
+  extractedText,
   setSummaryResult,
   handleSummarize,
   handleFileChange,
   loading,
 }) => {
-  const [summaryType, setSummaryType] = useState("main");
+  const [summaryType, setSummaryType] = useState("short");
   const userData = JSON.parse(localStorage.getItem('userData')) || {};
   const coin = userData.coin || 0;
 
@@ -94,7 +95,7 @@ const SummarizeTextTab = ({
                     },
                   }}
                 >
-                  Tải tài liệu lên
+                  Tải lên tài liệu
                   <input
                     type="file"
                     accept=".pdf, .docx"
@@ -182,7 +183,7 @@ const SummarizeTextTab = ({
                     }}
                   >
                     <MenuItem value="short">Tóm tắt ngắn gọn</MenuItem>
-                    <MenuItem value="main">Tóm tắt ý chính</MenuItem>
+                    <MenuItem value="medium">Tóm tắt vừa phải</MenuItem>
                     <MenuItem value="detailed">Tóm tắt chi tiết</MenuItem>
                   </Select>
                 </FormControl>
@@ -214,6 +215,28 @@ const SummarizeTextTab = ({
                   )}
                 </Button>
               </Box>
+
+                    {extractedText && (
+                      <Box
+                        sx={{
+                          mt: 4,
+                          p: 2,
+                          backgroundColor: "#1a1a2a",
+                          borderRadius: "15px",
+                          color: "#ddddff",
+                          overflowWrap: "break-word",
+                        }}
+                      >
+                        <Typography variant="h6" sx={{ color: "#a0a0ff" }}>
+                          Văn bản gốc:
+                        </Typography>
+                        <Typography variant="body1" sx={{ whiteSpace: "pre-line", mt: 1 }}>
+                          {extractedText}
+                        </Typography>
+                      </Box>
+                    )}
+
+              
 
               {!summaryResult && (
                 <Paper
@@ -276,6 +299,9 @@ const SummarizeTextTab = ({
                   </Box>
                 </Paper>
               )}
+
+
+
 
               {summaryResult && (
                 <Box
