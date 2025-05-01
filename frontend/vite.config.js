@@ -21,4 +21,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    include: ['pdfjs-dist/build/pdf.worker.min.js']
+  }
 });
+
+

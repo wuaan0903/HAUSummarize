@@ -10,7 +10,12 @@ import {
   Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import * as pdfjsLib from "pdfjs-dist";
+import * as pdfjsLib from 'pdfjs-dist';
+import { GlobalWorkerOptions } from 'pdfjs-dist/build/pdf';
+import workerURL from 'pdfjs-dist/build/pdf.worker.js?url';
+
+GlobalWorkerOptions.workerSrc = workerURL;
+
 import mammoth from "mammoth";
 import "animate.css";
 import axios from "axios";
@@ -83,35 +88,37 @@ const MainPage = () => {
 
   const readPDF = (file) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const pdfData = new Uint8Array(event.target.result);
-      pdfjsLib.getDocument(pdfData).promise.then((pdf) => {
-        let text = "";
-        const numPages = pdf.numPages;
-
-        const extractPageText = (pageNum) => {
-          return pdf.getPage(pageNum).then((page) => {
-            return page.getTextContent().then((textContent) => {
-              textContent.items.forEach((item) => {
-                text += item.str + " ";
-              });
-            });
+    reader.onload = function (event) {
+      const typedArray = new Uint8Array(reader.result);
+  
+      pdfjsLib.getDocument(typedArray).promise
+        .then((pdf) => {
+          const pagesPromises = [];
+  
+          for (let i = 1; i <= pdf.numPages; i++) {
+            pagesPromises.push(
+              pdf.getPage(i).then((page) =>
+                page.getTextContent().then((content) => {
+                  return content.items.map((item) => item.str).join(" ");
+                })
+              )
+            );
+          }
+  
+          Promise.all(pagesPromises).then((pagesText) => {
+            const fullText = pagesText.join("\n");
+            setInputText(fullText); // ✅ dùng state React thay vì document.getElementById
           });
-        };
-
-        const pagePromises = [];
-        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-          pagePromises.push(extractPageText(pageNum));
-        }
-
-        Promise.all(pagePromises).then(() => {
-          setInputText(text);
-          addAlert("Đã tải nội dung từ file PDF.", "success");
+        })
+        .catch((error) => {
+          addAlert("Không thể đọc file PDF!", "error");
+          console.error(error);
         });
-      });
     };
+  
     reader.readAsArrayBuffer(file);
   };
+  
 
   const readWord = (file) => {
     const reader = new FileReader();
@@ -120,7 +127,15 @@ const MainPage = () => {
       mammoth
         .extractRawText({ arrayBuffer })
         .then((result) => {
-          setInputText(result.value);
+          let text = result.value;
+        
+          // Xử lý: loại bỏ nhiều dòng trống liên tiếp thành 1
+          text = text.replace(/\n\s*\n+/g, '\n\n');
+        
+          // Loại bỏ dòng trống đầu và cuối
+          text = text.trim();
+        
+          setInputText(text);
           addAlert("Đã tải nội dung từ file Word.", "success");
         })
         .catch((err) => {
@@ -163,6 +178,7 @@ const handleSummarize = async (summaryType) => {
       summary_type: summaryType,
     });
     setSummaryResult(response.data.summary);
+    setExtractedText(response.data.full_text);
     if (response.data.coin !== undefined) {
       // Cập nhật coin nếu user đăng nhập và trừ coin
       const updatedUserData = { ...userData, coin: response.data.coin };
@@ -192,7 +208,7 @@ const handleSummarize = async (summaryType) => {
   }
 };
 
-  const handleSummarizePost = async () => {
+  const handleSummarizePost = async (summaryType) => {
     if (!inputText.trim()) {
       addAlert("Vui lòng nhập link bài viết để tóm tắt", "warning");
       return;
@@ -207,6 +223,7 @@ const handleSummarize = async (summaryType) => {
         body: JSON.stringify({
           url: inputText,
           user_id: userData?.userId ?? null,
+          summary_type: summaryType,
         }),
       });
       const data = await res.json();
@@ -409,6 +426,7 @@ const handleSummarize = async (summaryType) => {
             setInputText={setInputText}
             summaryResult={summaryResult}
             setSummaryResult={setSummaryResult}
+            extractedText={extractedText}
             handleSummarize={handleSummarize}
             handleFileChange={handleFileChange}
             loading={loading}
