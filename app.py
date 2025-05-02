@@ -12,6 +12,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
+import yt_dlp
+import whisper
+from pydub import AudioSegment
 
 MODEL_DIR = "wuaan0903/HAUSummarize"
 
@@ -67,6 +70,56 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 print(f"[INFO] Đã load model trên thiết bị: {device}")
 
+# Hàm tải âm thanh từ YouTube
+def download_youtube_audio(url, output_path="temp_audio"):
+    try:
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': output_path,  # Không thêm .mp3 để tránh temp_audio.mp3.mp3
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'ffmpeg_location': 'C:\\ffmpeg\\bin\\ffmpeg.exe',  # Đường dẫn đúng
+            'keep_file': True,  # Giữ file gốc
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        final_audio_path = output_path + ".mp3"  # File được tạo bởi postprocessor
+        if not os.path.exists(final_audio_path):
+            print(f"[LỖI] File âm thanh {final_audio_path} không được tạo")
+            return None
+        return final_audio_path
+    except Exception as e:
+        print(f"[LỖI] Tải âm thanh: {e}")
+        return None
+
+# Hàm chuyển âm thanh thành văn bản
+def transcribe_audio(audio_path):
+    try:
+        if not os.path.exists(audio_path):
+            print(f"[LỖI] File âm thanh {audio_path} không tồn tại")
+            return None
+        # Load mô hình Whisper medium
+        whisper_model = whisper.load_model("medium")  # Sử dụng mô hình medium cho tiếng Việt
+        # Tối ưu hóa: Giới hạn độ dài âm thanh (10 phút đầu tiên)
+        audio = AudioSegment.from_file(audio_path)
+        max_duration_ms = 10 * 60 * 1000  # 10 phút
+        if len(audio) > max_duration_ms:
+            audio = audio[:max_duration_ms]
+            temp_path = "temp_short_audio.mp3"
+            audio.export(temp_path, format="mp3")
+            audio_path = temp_path
+        result = whisper_model.transcribe(audio_path, language="vi")  # Chỉ định ngôn ngữ tiếng Việt
+        return result["text"]
+    except Exception as e:
+        print(f"[LỖI] Chuyển âm thanh thành văn bản: {e}")
+        return None
+    finally:
+        # Xóa file âm thanh tạm nếu được tạo
+        if 'temp_short_audio.mp3' in audio_path and os.path.exists(audio_path):
+            os.remove(audio_path)
 
 # Hàm tóm tắt
 def summarize(text, max_input_length=2024, max_output_length=300):
@@ -87,15 +140,13 @@ def summarize(text, max_input_length=2024, max_output_length=300):
 
     print("[INFO] Đang sinh tóm tắt...")
     output_ids = model.generate(
-    input_ids=input_ids,
-    # min_length=128,
-    max_length=512,           # cho phép dài hơn
-    num_beams=5,
-    early_stopping=True,
-    repetition_penalty=2.0,
-    no_repeat_ngram_size=3
-)
-
+        input_ids=input_ids,
+        max_length=512,           # cho phép dài hơn
+        num_beams=5,
+        early_stopping=True,
+        repetition_penalty=2.0,
+        no_repeat_ngram_size=3
+    )
 
     print("[INFO] Đang giải mã kết quả...")
     summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
@@ -151,7 +202,6 @@ def summarize_v2(text, max_input_length=2024, max_output_length=512, mode="struc
 
     return summary
 
-
 def split_text_smart(text, max_input_tokens=2024, n_chunks=None):
     sentences = re.split(r'(?<=[.!?…])\s+', text.strip())
     all_tokens = [tokenizer.encode(sentence, truncation=False) for sentence in sentences]
@@ -192,9 +242,6 @@ def split_text_smart(text, max_input_tokens=2024, n_chunks=None):
 
     return chunks
 
-
-
-
 def summarize_long_text(text):
     # Ước lượng số token sơ bộ dựa vào số từ
     token_estimate = len(text.split())
@@ -204,7 +251,7 @@ def summarize_long_text(text):
         return summarize(text)  # Tóm tắt trực tiếp nếu văn bản ngắn
 
     # Nếu dài hơn, chia thành các đoạn nhỏ
-    chunks = split_text_smart(text, max_input_tokens=400,n_chunks=3)
+    chunks = split_text_smart(text, max_input_tokens=400, n_chunks=3)
     print(f"[INFO] Tổng số đoạn chia nhỏ: {len(chunks)}")
 
     all_summaries = []
@@ -216,7 +263,6 @@ def summarize_long_text(text):
     # Gộp lại thành bản tóm tắt cuối cùng
     final_summary = " ".join(all_summaries)
     return final_summary
-
 
 def summarize_medium_text(text):
     # Ước lượng số token đơn giản theo số từ 
@@ -224,10 +270,10 @@ def summarize_medium_text(text):
 
     if token_estimate < 400:
         print("[INFO] Văn bản ngắn, không cần chia nhỏ.")
-        return summarize_v2(text,mode="structured")  # Tóm tắt trực tiếp nếu văn bản ngắn
+        return summarize_v2(text, mode="structured")  # Tóm tắt trực tiếp nếu văn bản ngắn
 
     # Nếu dài thì chia nhỏ
-    chunks = split_text_smart(text, max_input_tokens=600,n_chunks=2)
+    chunks = split_text_smart(text, max_input_tokens=600, n_chunks=2)
     print(f"[INFO] Tổng số đoạn chia nhỏ: {len(chunks)}")
 
     all_summaries = []
@@ -239,7 +285,6 @@ def summarize_medium_text(text):
     # Gộp lại thành bản tóm tắt cuối cùng
     final_summary = " ".join(all_summaries)
     return final_summary
-
 
 def extract_main_content(url):
     try:
@@ -268,8 +313,6 @@ def extract_main_content(url):
     except Exception as e:
         print(f"Error: {e}")
         return None
-    
-
 
 def calculate_coin_required(word_count, summary_type):
     if summary_type == 'short':
@@ -326,7 +369,6 @@ def api_summarize():
                     user_id=user_id,
                     amount=-coin_required,
                     type='summarize',
-                    
                 )
                 db.session.add(transaction)
 
@@ -361,7 +403,7 @@ def api_summarize():
     except Exception as e:
         print("[LỖI]:", str(e))
         return jsonify({'error': 'Đã có lỗi xảy ra trong quá trình tóm tắt.'}), 500
-    
+
 @app.route('/api/summarize-article', methods=['POST'])
 def summarize_article():
     data = request.get_json()
@@ -373,34 +415,157 @@ def summarize_article():
         return jsonify({"error": "URL is required"}), 400
 
     content = extract_main_content(url)
-
     if not content:
         return jsonify({"error": "Không thể lấy nội dung từ liên kết"}), 500
 
-    
-        # Gọi hàm tương ứng theo loại tóm tắt
-    if summary_type == "short":
-        summary = summarize(content)
-    elif summary_type == "medium":
-        summary = summarize_medium_text(content)
-    elif summary_type == "detailed":
-        summary = summarize_long_text(content)
-    else:
-        return jsonify({'error': 'Loại tóm tắt không hợp lệ.'}), 400
+    word_count = len(content.strip().split())
+    coin_required = calculate_coin_required(word_count, summary_type)
 
-    if user_id:
-        history_entry = History(
-            content=content,
-            summary=summary,
-            user_id=user_id
-        )
-        db.session.add(history_entry)
+    try:
+        # Nếu có user thì kiểm tra số xu và trừ
+        if user_id:
+            user = User.query.get(user_id)
+            if not user:
+                return jsonify({'error': 'Không tìm thấy người dùng'}), 404
+
+            if user.coin < coin_required:
+                return jsonify({'error': f'Bạn cần {coin_required} xu để tóm tắt, nhưng chỉ có {user.coin} xu.'}), 400
+
+            # Trừ xu nếu cần
+            if coin_required > 0:
+                user.coin -= coin_required
+                transaction = Transaction(
+                    user_id=user_id,
+                    amount=-coin_required,
+                    type='summarize_article',
+                )
+                db.session.add(transaction)
+
+        # Tóm tắt nội dung
+        if summary_type == "short":
+            summary = summarize(content)
+        elif summary_type == "medium":
+            summary = summarize_medium_text(content)
+        elif summary_type == "detailed":
+            summary = summarize_long_text(content)
+        else:
+            return jsonify({'error': 'Loại tóm tắt không hợp lệ.'}), 400
+
+        # Lưu lịch sử
+        if user_id:
+            history_entry = History(
+                content=content,
+                summary=summary,
+                user_id=user_id
+            )
+            db.session.add(history_entry)
+
         db.session.commit()
 
-    return jsonify({
-        'summary': summary,
-        'full_text': content
-    })
+        return jsonify({
+            'summary': summary,
+            'full_text': content,
+            'coin_used': coin_required,
+            'remaining_coin': user.coin if user_id else None
+        })
+
+    except Exception as e:
+        print("[LỖI]:", str(e))
+        return jsonify({'error': 'Đã có lỗi xảy ra trong quá trình tóm tắt.'}), 500
+
+@app.route('/api/summarize-video', methods=['POST'])
+def summarize_video():
+    try:
+        data = request.get_json()
+        url = data.get('url')
+        user_id = data.get('user_id')
+        summary_type = data.get("summary_type", "short")
+
+        print(f"[DEBUG] Dữ liệu nhận được: url={url}, user_id={user_id}, summary_type={summary_type}")
+
+        if not url:
+            print("[ERROR] Thiếu URL video")
+            return jsonify({'error': 'URL video là bắt buộc'}), 400
+
+        # Tải âm thanh từ YouTube
+        print("[INFO] Đang tải âm thanh từ YouTube...")
+        audio_path = download_youtube_audio(url, output_path="temp_audio")
+        if not audio_path:
+            print("[ERROR] Không thể tải âm thanh từ video")
+            return jsonify({'error': 'Không thể tải âm thanh từ video'}), 500
+
+        # Chuyển âm thanh thành văn bản
+        print("[INFO] Đang chuyển âm thanh thành văn bản...")
+        transcript = transcribe_audio(audio_path)
+        if not transcript:
+            print("[ERROR] Không thể chuyển âm thanh thành văn bản")
+            return jsonify({'error': 'Không thể chuyển âm thanh thành văn bản'}), 500
+
+        word_count = len(transcript.strip().split())
+        coin_required = calculate_coin_required(word_count, summary_type)
+
+        print(f"[DEBUG] Transcript có {word_count} từ, yêu cầu {coin_required} xu")
+
+        user = None
+        if user_id:
+            user = User.query.get(user_id)
+            print(f"[DEBUG] Truy vấn người dùng: {user}")
+            if not user:
+                print("[ERROR] Không tìm thấy người dùng")
+                return jsonify({'error': 'Không tìm thấy người dùng'}), 404
+
+            if user.coin < coin_required:
+                print(f"[ERROR] Không đủ xu: có {user.coin}, cần {coin_required}")
+                return jsonify({'error': f'Bạn cần {coin_required} xu để tóm tắt, nhưng chỉ có {user.coin} xu.'}), 400
+
+            if coin_required > 0:
+                user.coin -= coin_required
+                transaction = Transaction(
+                    user_id=user_id,
+                    amount=-coin_required,
+                    type='summarize_video',
+                )
+                db.session.add(transaction)
+                print(f"[DEBUG] Đã tạo giao dịch trừ xu")
+
+        print("[INFO] Đang tóm tắt nội dung video...")
+        if summary_type == "short":
+            summary = summarize(transcript)
+        elif summary_type == "medium":
+            summary = summarize_medium_text(transcript)
+        elif summary_type == "detailed":
+            summary = summarize_long_text(transcript)
+        else:
+            print("[ERROR] Loại tóm tắt không hợp lệ")
+            return jsonify({'error': 'Loại tóm tắt không hợp lệ.'}), 400
+
+        if user_id:
+            history_entry = History(
+                content=transcript,
+                summary=summary,
+                user_id=user_id
+            )
+            db.session.add(history_entry)
+            print(f"[DEBUG] Đã thêm lịch sử tóm tắt cho người dùng {user_id}")
+
+        db.session.commit()
+        print("[INFO] Hoàn tất và lưu vào DB")
+
+        return jsonify({
+            'summary': summary,
+            'transcript': transcript,
+            'coin_used': coin_required,
+            'remaining_coin': user.coin if user else None
+        })
+
+    except Exception as e:
+        print("[LỖI TOÀN CỤC]:", str(e))
+        return jsonify({'error': 'Đã có lỗi xảy ra trong quá trình tóm tắt video.'}), 500
+    finally:
+        if 'audio_path' in locals() and os.path.exists(audio_path):
+            print(f"[INFO] Đang xóa file âm thanh tạm: {audio_path}")
+            os.remove(audio_path)
+
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -443,18 +608,9 @@ def login():
         'username': user.username,
         'coin': user.coin
     })
-    
-    
+
 @app.route('/api/users', methods=['GET'])
-
 def get_users():
-    # current_user_id = get_jwt_identity()
-    # current_user = User.query.get(current_user_id)
-
-    # # Chỉ cho phép admin (hoặc thêm điều kiện phù hợp nếu cần)
-    # if current_user.username != 'admin':
-    #     return jsonify({'error': 'Bạn không có quyền truy cập danh sách người dùng'}), 403
-
     users = User.query.all()
     user_list = []
 
@@ -467,8 +623,7 @@ def get_users():
         }
         user_list.append(user_data)
 
-    return jsonify({'users': user_list}), 200    
-
+    return jsonify({'users': user_list}), 200
 
 @app.route('/api/users/<int:user_id>/recharge', methods=['POST'])
 def recharge(user_id):
@@ -484,7 +639,7 @@ def recharge(user_id):
 
     user.coin += amount
     
-     # Ghi lại giao dịch
+    # Ghi lại giao dịch
     transaction = Transaction(
         user_id=user_id,
         type='recharge',
@@ -515,7 +670,6 @@ def get_user_transactions(user_id):
 
     return jsonify({'transactions': transaction_list})
 
-
 # API: Lấy tất cả giao dịch nạp xu
 @app.route('/api/transactions/recharges', methods=['GET'])
 def get_all_recharges():
@@ -535,7 +689,6 @@ def get_all_recharges():
     except Exception as e:
         print("[LỖI]:", str(e))
         return jsonify({'error': 'Không thể truy vấn dữ liệu'}), 500
-
 
 @app.route('/api/statistics', methods=['GET'])
 def get_statistics():
@@ -566,7 +719,6 @@ def get_statistics():
     except Exception as e:
         print("Lỗi thống kê:", str(e))
         return jsonify({'error': 'Lỗi khi lấy dữ liệu thống kê'}), 500
-
 
 @app.route('/api/summary-stats-7days', methods=['GET'])
 def summary_stats_7days():
@@ -611,7 +763,7 @@ def get_history():
 
 @app.route('/history/<int:history_id>', methods=['DELETE'])
 def delete_history(history_id):
-    history = History.query.get(history_id)
+    history = User.query.get(history_id)
     if not history:
         return jsonify({'error': 'Lịch sử không tồn tại'}), 404
 

@@ -1,18 +1,11 @@
 import React, { useState, useEffect } from "react";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
-import {
-  Box,
-  Tabs,
-  Tab,
-  Typography,
-  IconButton,
-  Alert,
-} from "@mui/material";
+import { Box, Tabs, Tab, Typography, IconButton, Alert } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import * as pdfjsLib from 'pdfjs-dist';
-import { GlobalWorkerOptions } from 'pdfjs-dist/build/pdf';
-import workerURL from 'pdfjs-dist/build/pdf.worker.js?url';
+import * as pdfjsLib from "pdfjs-dist";
+import { GlobalWorkerOptions } from "pdfjs-dist/build/pdf";
+import workerURL from "pdfjs-dist/build/pdf.worker.js?url";
 
 GlobalWorkerOptions.workerSrc = workerURL;
 
@@ -25,6 +18,7 @@ import SummarizeArticleTab from "../components/SummarizeArticleTab";
 import SummarizeVideoTab from "../components/SummarizeVideoTab";
 
 const MainPage = () => {
+  const [transcript, setTranscript] = useState("");
   const [tabIndex, setTabIndex] = useState(0);
   const [inputText, setInputText] = useState("");
   const [summaryResult, setSummaryResult] = useState("");
@@ -90,11 +84,12 @@ const MainPage = () => {
     const reader = new FileReader();
     reader.onload = function (event) {
       const typedArray = new Uint8Array(reader.result);
-  
-      pdfjsLib.getDocument(typedArray).promise
-        .then((pdf) => {
+
+      pdfjsLib
+        .getDocument(typedArray)
+        .promise.then((pdf) => {
           const pagesPromises = [];
-  
+
           for (let i = 1; i <= pdf.numPages; i++) {
             pagesPromises.push(
               pdf.getPage(i).then((page) =>
@@ -104,7 +99,7 @@ const MainPage = () => {
               )
             );
           }
-  
+
           Promise.all(pagesPromises).then((pagesText) => {
             const fullText = pagesText.join("\n");
             setInputText(fullText); // ✅ dùng state React thay vì document.getElementById
@@ -115,10 +110,9 @@ const MainPage = () => {
           console.error(error);
         });
     };
-  
+
     reader.readAsArrayBuffer(file);
   };
-  
 
   const readWord = (file) => {
     const reader = new FileReader();
@@ -128,13 +122,13 @@ const MainPage = () => {
         .extractRawText({ arrayBuffer })
         .then((result) => {
           let text = result.value;
-        
+
           // Xử lý: loại bỏ nhiều dòng trống liên tiếp thành 1
-          text = text.replace(/\n\s*\n+/g, '\n\n');
-        
+          text = text.replace(/\n\s*\n+/g, "\n\n");
+
           // Loại bỏ dòng trống đầu và cuối
           text = text.trim();
-        
+
           setInputText(text);
           addAlert("Đã tải nội dung từ file Word.", "success");
         })
@@ -146,67 +140,67 @@ const MainPage = () => {
     reader.readAsArrayBuffer(file);
   };
 
-const handleSummarize = async (summaryType) => {
-  if (!inputText.trim()) {
-    addAlert("Vui lòng nhập văn bản cần tóm tắt!", "warning");
-    return;
-  }
-
-  // Ước lượng số token: 1 từ ~0.75 token, 340 từ ~1024 token
-  const wordCount = inputText.split(/\s+/).length;
-  const isLongText = wordCount > 340; // ~1024 token
-
-  if (isLongText) {
-    const confirmUseCoin = window.confirm(
-      "Văn bản quá dài! Bạn có muốn sử dụng 1 xu để tóm tắt không?"
-    );
-    if (!confirmUseCoin) {
-      addAlert("Đã hủy tóm tắt.", "info");
+  const handleSummarize = async (summaryType) => {
+    if (!inputText.trim()) {
+      addAlert("Vui lòng nhập văn bản cần tóm tắt!", "warning");
       return;
     }
-    if (!userData) {
-      addAlert("Vui lòng đăng nhập để tóm tắt văn bản dài!", "warning");
-      return;
-    }
-  }
 
-  try {
-    setLoading(true);
-    const response = await axios.post("http://localhost:5000/api/summarize", {
-      user_id: userData?.userId ?? null, // Gửi null cho văn bản ngắn
-      text: inputText,
-      summary_type: summaryType,
-    });
-    setSummaryResult(response.data.summary);
-    setExtractedText(response.data.full_text);
-    if (response.data.coin !== undefined) {
-      // Cập nhật coin nếu user đăng nhập và trừ coin
-      const updatedUserData = { ...userData, coin: response.data.coin };
-      localStorage.setItem("userData", JSON.stringify(updatedUserData));
-      addAlert(
-        `Tóm tắt thành công! Đã sử dụng 1 xu. Còn lại: ${response.data.coin} xu.`,
-        "success"
+    // Ước lượng số token: 1 từ ~0.75 token, 340 từ ~1024 token
+    const wordCount = inputText.split(/\s+/).length;
+    const isLongText = wordCount > 340; // ~1024 token
+
+    if (isLongText) {
+      const confirmUseCoin = window.confirm(
+        "Văn bản quá dài! Bạn có muốn sử dụng 1 xu để tóm tắt không?"
       );
-    } else {
-      addAlert("Tóm tắt thành công!", "success");
-    }
-  } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.data?.error) {
-      const errorMsg = error.response.data.error;
-      if (errorMsg.includes("Không đủ coin")) {
-        addAlert("Không đủ xu để tóm tắt! Vui lòng nạp thêm xu.", "error");
-      } else if (errorMsg.includes("Cần đăng nhập")) {
-        addAlert("Vui lòng đăng nhập để tóm tắt văn bản dài!", "error");
-      } else {
-        addAlert(errorMsg, "error");
+      if (!confirmUseCoin) {
+        addAlert("Đã hủy tóm tắt.", "info");
+        return;
       }
-    } else {
-      addAlert("Đã có lỗi xảy ra, xin vui lòng thử lại sau.", "error");
+      if (!userData) {
+        addAlert("Vui lòng đăng nhập để tóm tắt văn bản dài!", "warning");
+        return;
+      }
     }
-  } finally {
-    setLoading(false);
-  }
-};
+
+    try {
+      setLoading(true);
+      const response = await axios.post("http://localhost:5000/api/summarize", {
+        user_id: userData?.userId ?? null, // Gửi null cho văn bản ngắn
+        text: inputText,
+        summary_type: summaryType,
+      });
+      setSummaryResult(response.data.summary);
+      setExtractedText(response.data.full_text);
+      if (response.data.coin !== undefined) {
+        // Cập nhật coin nếu user đăng nhập và trừ coin
+        const updatedUserData = { ...userData, coin: response.data.coin };
+        localStorage.setItem("userData", JSON.stringify(updatedUserData));
+        addAlert(
+          `Tóm tắt thành công! Đã sử dụng 1 xu. Còn lại: ${response.data.coin} xu.`,
+          "success"
+        );
+      } else {
+        addAlert("Tóm tắt thành công!", "success");
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data?.error) {
+        const errorMsg = error.response.data.error;
+        if (errorMsg.includes("Không đủ coin")) {
+          addAlert("Không đủ xu để tóm tắt! Vui lòng nạp thêm xu.", "error");
+        } else if (errorMsg.includes("Cần đăng nhập")) {
+          addAlert("Vui lòng đăng nhập để tóm tắt văn bản dài!", "error");
+        } else {
+          addAlert(errorMsg, "error");
+        }
+      } else {
+        addAlert("Đã có lỗi xảy ra, xin vui lòng thử lại sau.", "error");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSummarizePost = async (summaryType) => {
     if (!inputText.trim()) {
@@ -238,6 +232,70 @@ const handleSummarize = async (summaryType) => {
     } catch (error) {
       setSummaryResult("Đã có lỗi xảy ra khi xử lý.");
       addAlert("Đã có lỗi xảy ra khi xử lý.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSummarizeVideo = async (summaryType = "medium") => {
+    if (!inputText.trim()) {
+      addAlert("Vui lòng nhập link video YouTube!", "warning");
+      return;
+    }
+
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+    if (!youtubeRegex.test(inputText)) {
+      addAlert("Link video không hợp lệ! Vui lòng nhập link YouTube.", "error");
+      return;
+    }
+
+    if (!userData) {
+      addAlert("Vui lòng đăng nhập để tóm tắt video!", "warning");
+      return;
+    }
+
+    const confirmUseCoin = window.confirm(
+      "Tóm tắt video sẽ sử dụng 2 xu. Bạn có muốn tiếp tục không?"
+    );
+    if (!confirmUseCoin) {
+      addAlert("Đã hủy tóm tắt video.", "info");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        "http://localhost:5000/api/summarize-video",
+        {
+          url: inputText,
+          user_id: userData?.userId ?? null,
+          summary_type: summaryType,
+        }
+      );
+
+      setTranscript(response.data.transcript);
+      setSummaryResult(response.data.summary);
+
+      const updatedUserData = { ...userData, coin: userData.coin - 2 };
+      localStorage.setItem("userData", JSON.stringify(updatedUserData));
+      addAlert(
+        `Tóm tắt video thành công! Đã sử dụng 2 xu. Còn lại: ${updatedUserData.coin} xu.`,
+        "success"
+      );
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data?.error) {
+        const errorMsg = error.response.data.error;
+        if (errorMsg.includes("Không đủ coin")) {
+          addAlert(
+            "Không đủ xu để tóm tắt video! Vui lòng nạp thêm xu.",
+            "error"
+          );
+        } else {
+          addAlert(errorMsg, "error");
+        }
+      } else {
+        addAlert("Đã có lỗi xảy ra khi tóm tắt video.", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -445,7 +503,18 @@ const handleSummarize = async (summaryType) => {
           />
         )}
 
-        {tabIndex === 2 && <SummarizeVideoTab />}
+        {tabIndex === 2 && (
+          <SummarizeVideoTab
+            inputText={inputText}
+            setInputText={setInputText}
+            summaryResult={summaryResult}
+            setSummaryResult={setSummaryResult}
+            transcript={transcript}
+            setTranscript={setTranscript}
+            handleSummarizeVideo={handleSummarizeVideo}
+            loading={loading}
+          />
+        )}
       </Box>
     </Box>
   );
