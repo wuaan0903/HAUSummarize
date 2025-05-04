@@ -20,9 +20,10 @@ const Header = ({ onOpenSidebar }) => {
   const navigate = useNavigate();
 
   const userData = JSON.parse(localStorage.getItem("userData")) || {};
-  const isLoggedIn = !!userData;
+  const isLoggedIn = !!userData && !!userData.username; // Đảm bảo username hợp lệ
   const username = userData.username || "";
-  const avatarInitial = username ? username[0].toUpperCase() : "?";
+  const role = userData.role || "user"; // Lấy role, mặc định là "user" nếu không có
+  const avatarInitial = username ? username[0].toUpperCase() : "U"; // Mặc định là "U" nếu không có username
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -33,9 +34,9 @@ const Header = ({ onOpenSidebar }) => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("userData");
+    localStorage.removeItem("userData"); // Xóa userData khỏi localStorage
     handleClose();
-    navigate("/main");
+    navigate("/main"); // Chuyển hướng về trang chính
   };
 
   const handleAccount = () => {
@@ -43,8 +44,8 @@ const Header = ({ onOpenSidebar }) => {
     handleClose();
   };
 
-  const handleContact = () => {
-    navigate("/contact");
+  const handleAdmin = () => {
+    navigate("/admin");
     handleClose();
   };
 
@@ -103,7 +104,9 @@ const Header = ({ onOpenSidebar }) => {
                 }}
               >
                 <MenuItem onClick={handleAccount}>Tài Khoản</MenuItem>
-                <MenuItem onClick={handleContact}>Liên hệ</MenuItem>
+                {role === "admin" && (
+                  <MenuItem onClick={handleAdmin}>Trang Admin</MenuItem>
+                )}
                 <MenuItem onClick={handleLogout}>Đăng xuất</MenuItem>
               </Menu>
             </>

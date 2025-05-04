@@ -237,7 +237,7 @@ const MainPage = () => {
     }
   };
 
-  const handleSummarizeVideo = async (summaryType = "medium") => {
+  const handleSummarizeVideo = async (summaryType) => {
     if (!inputText.trim()) {
       addAlert("Vui lòng nhập link video YouTube!", "warning");
       return;

@@ -66,13 +66,13 @@ const Login = () => {
         throw new Error('Phản hồi từ API không thành công!');
       }
 
-      const { access_token, userId, coin, username: responseUsername } = response.data;
+      const { access_token, userId, coin, username: responseUsername, email, role } = response.data;
       if (!access_token || !userId || !responseUsername) {
         throw new Error('Dữ liệu trả về không đầy đủ!');
       }
 
       try {
-        const userData = { access_token, userId, username: responseUsername, coin };
+        const userData = { access_token, userId, username: responseUsername, coin, email, role };
         localStorage.setItem('userData', JSON.stringify(userData));
         console.log('userData saved:', userData);
       } catch (storageError) {

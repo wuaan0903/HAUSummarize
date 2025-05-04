@@ -36,6 +36,27 @@ class User(db.Model):
     email = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     coin = db.Column(db.Integer, default=500)
+    role = db.Column(db.String(50), default='user') 
+
+def create_admin():
+    with app.app_context():
+        admin = User.query.filter_by(username='admin').first()
+        if admin:
+            print("Tài khoản admin đã tồn tại!")
+            return
+
+        # Tạo tài khoản admin mới
+        admin_user = User(
+            username='admin',
+            email='admin@gmail.com',
+            password=generate_password_hash('admin123', method='pbkdf2:sha256'),  # Mã hóa mật khẩu
+            role='admin'
+        )
+
+        # Thêm vào session và commit vào database
+        db.session.add(admin_user)
+        db.session.commit()
+        print("Tài khoản admin đã được tạo thành công!")
 
 class History(db.Model):
     __tablename__ = 'history'
@@ -606,7 +627,9 @@ def login():
         'access_token': token,
         'userId': user.id,
         'username': user.username,
-        'coin': user.coin
+        'coin': user.coin,
+        'role': user.role,
+        'email': user.email,
     })
 
 @app.route('/api/users', methods=['GET'])
@@ -774,4 +797,5 @@ def delete_history(history_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        create_admin()
     app.run(debug=True)
