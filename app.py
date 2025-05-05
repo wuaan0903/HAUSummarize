@@ -264,12 +264,6 @@ def split_text_smart(text, max_input_tokens=2024, n_chunks=None):
     return chunks
 
 def summarize_long_text(text):
-    # Ước lượng số token sơ bộ dựa vào số từ
-    token_estimate = len(text.split())
-
-    if token_estimate < 600:
-        print("[INFO] Văn bản ngắn, không cần chia nhỏ.")
-        return summarize(text)  # Tóm tắt trực tiếp nếu văn bản ngắn
 
     # Nếu dài hơn, chia thành các đoạn nhỏ
     chunks = split_text_smart(text, max_input_tokens=400, n_chunks=3)
@@ -720,7 +714,7 @@ def get_statistics():
         total_users = User.query.count()
 
         # Tổng số lượt tóm tắt trong ngày
-        today = date.today()
+        today = datetime.utcnow().date()
         total_summaries_today = History.query.filter(
             db.func.date(History.created_at) == today
         ).count()
@@ -799,3 +793,6 @@ if __name__ == '__main__':
         db.create_all()
         create_admin()
     app.run(debug=True)
+    
+    
+    

@@ -738,6 +738,8 @@ const AdminDashboard = () => {
               </TableCell>
               <TableCell sx={{ color: "#ccc" }}>
                 {txn.type === 'recharge' ? 'Nạp ' +txn.amount + ' xu ' : 
+                txn.type === 'summarize_article' ? 'Tóm tắt bài viết' :
+                txn.type === 'summarize_youtube' ? 'Tóm tắt video' :
                 txn.type === 'summarize' ? 'Tóm tắt văn bản' : 'Khác'}
               </TableCell>
 
