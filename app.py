@@ -1,8 +1,11 @@
 import re
+import numpy as np
+from faster_whisper import WhisperModel
 from flask import Flask, request, jsonify
 from sqlalchemy import func
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 import torch
+import noisereduce as nr
 from flask_cors import CORS
 from bs4 import BeautifulSoup
 import requests
@@ -14,10 +17,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import yt_dlp
 import whisper
+from pydub.effects import normalize
 from pydub import AudioSegment
+from concurrent.futures import ThreadPoolExecutor
 
 MODEL_DIR = "wuaan0903/HAUSummarize"
-
+global_whisper_model = None
 app = Flask(__name__)
 CORS(app)
 
@@ -117,30 +122,68 @@ def download_youtube_audio(url, output_path="temp_audio"):
         return None
 
 # Hàm chuyển âm thanh thành văn bản
-def transcribe_audio(audio_path):
+def process_segment(seg_np, index):
+    """Xử lý một đoạn âm thanh."""
+    global global_whisper_model
     try:
+        print(f"Đang xử lý đoạn {index+1}...")
+        segments_trans, _ = global_whisper_model.transcribe(
+            seg_np, language="vi", beam_size=5
+        )
+        text = " ".join(segment.text for segment in segments_trans)
+        torch.cuda.empty_cache()  # Giải phóng VRAM
+        return text
+    except Exception as e:
+        print(f"[LỖI] Xử lý đoạn {index+1}: {e}")
+        return ""
+
+def transcribe_audio(audio_path):
+    global global_whisper_model
+    try:
+        # Kiểm tra file tồn tại
         if not os.path.exists(audio_path):
             print(f"[LỖI] File âm thanh {audio_path} không tồn tại")
             return None
-        # Load mô hình Whisper medium
-        whisper_model = whisper.load_model("medium")  # Sử dụng mô hình medium cho tiếng Việt
-        # Tối ưu hóa: Giới hạn độ dài âm thanh (10 phút đầu tiên)
+
+        # Load mô hình nếu chưa có
+        if global_whisper_model is None:
+            print("Đang load mô hình faster-whisper...")
+            global_whisper_model = WhisperModel(
+                model_size_or_path="medium",  # Nhanh, nhẹ cho GTX 1650
+                device="cuda" if torch.cuda.is_available() else "cpu",
+                compute_type="int8",
+                device_index=0
+            )
+
+        # Tiền xử lý âm thanh
         audio = AudioSegment.from_file(audio_path)
-        max_duration_ms = 10 * 60 * 1000  # 10 phút
-        if len(audio) > max_duration_ms:
-            audio = audio[:max_duration_ms]
-            temp_path = "temp_short_audio.mp3"
-            audio.export(temp_path, format="mp3")
-            audio_path = temp_path
-        result = whisper_model.transcribe(audio_path, language="vi")  # Chỉ định ngôn ngữ tiếng Việt
-        return result["text"]
+        audio = audio.set_frame_rate(16000).set_channels(1)
+        audio = normalize(audio, headroom=0.5)  # Normalize nhẹ
+
+        # Chia đoạn (30 giây)
+        segment_duration_ms = 30 * 1000
+        segments = [audio[i:i+segment_duration_ms] for i in range(0, len(audio), segment_duration_ms)]
+        transcribed_texts = []
+
+        # Xử lý song song nhẹ (max 2 luồng để tránh quá tải GTX 1650)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = []
+            for i, seg in enumerate(segments):
+                seg_np = np.array(seg.get_array_of_samples(), dtype=np.float32) / 32768.0
+                # Bỏ giảm nhiễu để tăng tốc
+                futures.append(executor.submit(process_segment, seg_np, i))
+            
+            for future in futures:
+                text = future.result()
+                if text:
+                    transcribed_texts.append(text)
+
+        # Gộp kết quả
+        return " ".join(transcribed_texts)
+
     except Exception as e:
         print(f"[LỖI] Chuyển âm thanh thành văn bản: {e}")
         return None
-    finally:
-        # Xóa file âm thanh tạm nếu được tạo
-        if 'temp_short_audio.mp3' in audio_path and os.path.exists(audio_path):
-            os.remove(audio_path)
 
 # Hàm tóm tắt
 def summarize(text, max_input_length=2024, max_output_length=300):
