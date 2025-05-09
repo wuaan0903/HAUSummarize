@@ -65,17 +65,21 @@ def create_admin():
 
 class History(db.Model):
     __tablename__ = 'history'
+    
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
     summary = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(50), nullable=True)   # Thêm biến type
+    input = db.Column(db.Text, nullable=True)        # Thêm biến input
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, nullable=True, onupdate=db.func.current_timestamp())
+    
     user = db.relationship('User', backref='histories')
 
     def __repr__(self):
-        return f'<History id={self.id} user_id={self.user_id}>'
-    
+        return f'<History id={self.id} user_id={self.user_id} type={self.type}>'
+
 class Transaction(db.Model):
     __tablename__ = 'transactions'
     id = db.Column(db.Integer, primary_key=True)
@@ -445,7 +449,9 @@ def api_summarize():
             history_entry = History(
                 content=text,
                 summary=summary,
-                user_id=user_id
+                user_id=user_id,
+                type="text",  # Lưu loại tóm tắt
+                input=text  # Lưu nội dung gốc
             )
             db.session.add(history_entry)
 
@@ -514,7 +520,9 @@ def summarize_article():
             history_entry = History(
                 content=content,
                 summary=summary,
-                user_id=user_id
+                user_id=user_id,
+                type="article",  # Thêm loại tóm tắt
+                input=url  # Lưu URL gốc
             )
             db.session.add(history_entry)
 
@@ -601,7 +609,9 @@ def summarize_video():
             history_entry = History(
                 content=transcript,
                 summary=summary,
-                user_id=user_id
+                user_id=user_id,
+                type="video",  # Thêm loại tóm tắt
+                input=url  # Lưu URL video gốc
             )
             db.session.add(history_entry)
             print(f"[DEBUG] Đã thêm lịch sử tóm tắt cho người dùng {user_id}")
@@ -816,20 +826,30 @@ def get_history():
         'id': h.id,
         'content': h.content,
         'summary': h.summary,
-        'created_at': h.created_at.isoformat()
+        'created_at': h.created_at.isoformat(),
+        'type': h.type,  # Thêm loại tóm tắt
+        'input': h.input,  # Thêm nội dung gốc
     } for h in histories]
 
     return jsonify(result), 200
 
 @app.route('/history/<int:history_id>', methods=['DELETE'])
 def delete_history(history_id):
-    history = User.query.get(history_id)
+    history = History.query.get(history_id)
     if not history:
         return jsonify({'error': 'Lịch sử không tồn tại'}), 404
 
     db.session.delete(history)
     db.session.commit()
     return jsonify({'message': 'Xoá thành công'}), 200
+
+@app.route('/api/user/<int:user_id>/coin')
+def get_user_coin(user_id):
+    user = User.query.get(user_id)
+    if user:
+        return jsonify({'coin': user.coin})
+    return jsonify({'error': 'User not found'}), 404
+
 
 if __name__ == '__main__':
     with app.app_context():

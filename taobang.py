@@ -5,20 +5,17 @@ db_path = os.path.join("instance", "mydatabase.db")
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
-# Tạo bảng transactions nếu chưa tồn tại
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    type TEXT,
-    amount INTEGER,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-)
-""")
+# Thêm cột 'type' nếu chưa có
+try:
+    cursor.execute("ALTER TABLE history ADD COLUMN type TEXT")
+except sqlite3.OperationalError:
+    print("Cột 'type' đã tồn tại.")
 
-# Lưu và đóng kết nối
+# Thêm cột 'input' nếu chưa có
+try:
+    cursor.execute("ALTER TABLE history ADD COLUMN input TEXT")
+except sqlite3.OperationalError:
+    print("Cột 'input' đã tồn tại.")
+
 conn.commit()
 conn.close()
-
-print("Đã tạo bảng transactions thành công.")

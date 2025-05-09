@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import {
   Box,
   Grid,
@@ -16,6 +16,8 @@ import {
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import Delete from "@mui/icons-material/Delete";
 import YouTubeIcon from "@mui/icons-material/YouTube";
+import MonetizationOn from "@mui/icons-material/MonetizationOn";
+
 import "animate.css";
 
 const commonStyles = {
@@ -81,6 +83,29 @@ const SummarizeVideoTab = ({
 }) => {
   const [summaryType, setSummaryType] = useState("short");
   const [error, setError] = useState("");
+  const userData = JSON.parse(localStorage.getItem("userData")) || {};
+  const [coin, setCoin] = useState(userData.coin || 0);
+  
+    // Hàm gọi API để lấy coin mới nhất
+    const fetchUserCoin = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/user/${userData.userId}/coin`);
+        const data = await res.json();
+        if (res.ok) {
+          setCoin(data.coin);
+  
+          // Cập nhật lại localStorage nếu cần
+          const updatedUser = { ...userData, coin: data.coin };
+          localStorage.setItem("userData", JSON.stringify(updatedUser));
+        }
+      } catch (error) {
+        console.error("Lỗi khi lấy số xu:", error);
+      }
+    };
+    // Gọi coin khi vừa load component
+    useEffect(() => {
+      fetchUserCoin();
+    }, []);
 
   const validateYouTubeUrl = (url) => {
     const regex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
@@ -126,8 +151,20 @@ const SummarizeVideoTab = ({
         <Grid container spacing={4} sx={{ px: 2 }}>
           <Grid item xs={12} md={12} width="800px">
             <Paper sx={commonStyles.paper}>
-              <Typography variant="h6" sx={{ color: "#a0a0ff", mb: 2, fontWeight: 600, textAlign: "center" }}>
+              <Typography variant="h6" sx={{ color: "#a0a0ff", mb: 2, fontWeight: 600, textAlign: "center" ,display: "flex", justifyContent: "space-between"}}>
                 Tóm tắt video YouTube
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <MonetizationOn sx={{ color: "#ffff66" }} />
+                  <Typography
+                    sx={{
+                      color: "#a0a0ff",
+                      fontWeight: 600,
+                      fontFamily: '"Roboto", sans-serif',
+                    }}
+                  >
+                    {coin}
+                  </Typography>
+                </Box>
               </Typography>
               <TextField
                 fullWidth

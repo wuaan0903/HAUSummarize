@@ -57,11 +57,24 @@ const MainPage = () => {
   };
 
   const handleSelectHistory = (item) => {
-    setInputText(item.content);
+    setInputText(item.input);
+    setExtractedText(item.content);
     setSummaryResult(item.summary);
-    setTabIndex(0);
+  
+    // Thiết lập tab index tùy theo loại dữ liệu
+    if (item.type === "text") {
+      setTabIndex(0);
+    } else if (item.type === "article") {
+      setTabIndex(1);
+    } else if (item.type === "video") {
+      setTabIndex(2);
+    } else {
+      setTabIndex(0); // Mặc định fallback nếu không xác định được type
+    }
+  
     setSidebarOpen(false);
   };
+  
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];

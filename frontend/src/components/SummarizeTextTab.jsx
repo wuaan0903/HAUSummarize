@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import {
   Grid,
   Paper,
@@ -30,15 +30,39 @@ const SummarizeTextTab = ({
 }) => {
   const [summaryType, setSummaryType] = useState("short");
   const userData = JSON.parse(localStorage.getItem('userData')) || {};
-  const coin = userData.coin || 0;
+  const [coin, setCoin] = useState(userData.coin || 0);
+
+  // Hàm gọi API để lấy coin mới nhất
+  const fetchUserCoin = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/user/${userData.userId}/coin`);
+      const data = await res.json();
+      if (res.ok) {
+        setCoin(data.coin);
+
+        // Cập nhật lại localStorage nếu cần
+        const updatedUser = { ...userData, coin: data.coin };
+        localStorage.setItem("userData", JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy số xu:", error);
+    }
+  };
+  // Gọi coin khi vừa load component
+  useEffect(() => {
+    fetchUserCoin();
+  }, []);
 
   const handleSummaryTypeChange = (event) => {
     setSummaryType(event.target.value);
   };
 
-  const handleSummarizeClick = () => {
-    handleSummarize(summaryType);
+  // Gọi hàm tóm tắt + cập nhật coin
+  const handleSummarizeClick = async () => {
+    await handleSummarize(summaryType);  // gọi hàm tóm tắt từ parent
+    await fetchUserCoin();               // cập nhật lại coin
   };
+
 
   return (
     <Box>

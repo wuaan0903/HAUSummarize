@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import {
   Box,
   Paper,
@@ -14,6 +14,8 @@ import {
 } from "@mui/material";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import Delete from "@mui/icons-material/Delete";
+import MonetizationOn from "@mui/icons-material/MonetizationOn";
+
 
 const SummarizeArticleTab = ({
   inputText,
@@ -26,13 +28,36 @@ const SummarizeArticleTab = ({
 }) => {
     const [summaryType, setSummaryType] = useState("short");
     const userData = JSON.parse(localStorage.getItem('userData')) || {};
-    const coin = userData.coin || 0;
+    const [coin, setCoin] = useState(userData.coin || 0);
+    
+      // Hàm gọi API để lấy coin mới nhất
+      const fetchUserCoin = async () => {
+        try {
+          const res = await fetch(`http://localhost:5000/api/user/${userData.userId}/coin`);
+          const data = await res.json();
+          if (res.ok) {
+            setCoin(data.coin);
+    
+            // Cập nhật lại localStorage nếu cần
+            const updatedUser = { ...userData, coin: data.coin };
+            localStorage.setItem("userData", JSON.stringify(updatedUser));
+          }
+        } catch (error) {
+          console.error("Lỗi khi lấy số xu:", error);
+        }
+      };
+      // Gọi coin khi vừa load component
+      useEffect(() => {
+        fetchUserCoin();
+      }, []);
+
     const handleSummaryTypeChange = (event) => {
       setSummaryType(event.target.value);
     };
   
-    const handleSummarizeClick = () => {
+    const handleSummarizeClick = async () => {
       handleSummarizePost(summaryType);
+      await fetchUserCoin();  
     };
   return (
     <Box
@@ -54,9 +79,23 @@ const SummarizeArticleTab = ({
         },
       }}
     >
-      <Typography variant="h6" sx={{ color: "#a0a0ff", mb: 2 }}>
+      <Typography variant="h6" sx={{ color: "#a0a0ff", mb: 2,display: "flex", justifyContent: "space-between" }}>
         Nhập liên kết bài viết
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <MonetizationOn sx={{ color: "#ffff66" }} />
+                  <Typography
+                    sx={{
+                      color: "#a0a0ff",
+                      fontWeight: 600,
+                      fontFamily: '"Roboto", sans-serif',
+                    }}
+                  >
+                    {coin}
+                  </Typography>
+                </Box>
       </Typography>
+
+      
 
       <TextField
         fullWidth
@@ -152,6 +191,7 @@ const SummarizeArticleTab = ({
                     "Tóm Tắt →"
                   )}
                 </Button>
+                
               </Box>
 
 
