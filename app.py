@@ -20,17 +20,33 @@ import whisper
 from pydub.effects import normalize
 from pydub import AudioSegment
 from concurrent.futures import ThreadPoolExecutor
+import uuid,json,hashlib,random
+import hmac
+import time  
+from datetime import datetime
+
 
 MODEL_DIR = "wuaan0903/HAUSummarize"
 global_whisper_model = None
 app = Flask(__name__)
 CORS(app)
 
-# Cấu hình
+# Cấu hình db
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mydatabase.db'
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+
+# Cấu hình ZaloPay Sandbox
+config = {
+    'zalopay_app_id': 2554,
+    'zalopay_key1': 'sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn',
+    'zalopay_key2': 'trMrHtvjo6myautxDUiAcYsVtaeQ8nhf',
+    'zalopay_endpoint': 'https://sb-openapi.zalopay.vn/v2/create',
+    'zalopay_callback_url': 'http://localhost:5000/callback',  # Để test local
+    'zalopay_redirect_url': 'http://localhost:5000/success'
+}
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
@@ -849,6 +865,128 @@ def get_user_coin(user_id):
     if user:
         return jsonify({'coin': user.coin})
     return jsonify({'error': 'User not found'}), 404
+
+
+@app.route('/api/create-zalopay-order', methods=['POST'])
+def create_zalopay_order():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        amount = data.get('amount')  # Số tiền (VNĐ)
+        coin = data.get('coin')     # Số xu muốn nạp
+
+        # Log để kiểm tra dữ liệu nhận được
+        print(f"Received data: {data}")
+        
+        if not user_id or not amount or not coin or amount <= 0 or coin <= 0:
+            return jsonify({'error': 'Thiếu user_id hoặc số tiền/xu không hợp lệ'}), 400
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'Không tìm thấy người dùng'}), 404
+
+        app_trans_id  = random.randrange(1000000)
+        print(random.randrange(1000000))
+
+        order = {
+            'app_id': config['zalopay_app_id'],
+            "app_trans_id": "{:%y%m%d}_{}".format(datetime.today(), app_trans_id ), # mã giao dich có định dạng yyMMdd_xxxx
+            'app_user': user.username,
+            'app_time': int(round(time.time() * 1000)),  # Thời gian hiện tại tính bằng mili giây
+            'amount': amount,
+            'description': f"Nạp {coin} xu cho tài khoản {user.username}",
+            'embed_data': json.dumps({'user_id': user_id, 'coin': coin}),
+            'item': json.dumps([]),  # Dữ liệu sản phẩm nếu có, có thể để là danh sách trống []
+            'bank_code': "zalopayapp",  # Mã ngân hàng ZaloPay
+        }
+        print(f"Order data being sent: {json.dumps(order, indent=4)}")
+
+        # Tạo dữ liệu dùng để tính toán MAC
+        data = f"{order['app_id']}|{order['app_trans_id']}|{order['app_user']}|{order['amount']}|{order['app_time']}|{order['embed_data']}|{order['item']}"
+        mac = hmac.new(config['zalopay_key1'].encode(), data.encode(), hashlib.sha256).hexdigest()
+        order['mac'] = mac
+        
+        # Log giá trị MAC
+        print(f"MAC: {mac}")
+
+        # Gửi yêu cầu đến ZaloPay
+        response = requests.post(config['zalopay_endpoint'], data=order)
+        result = response.json()
+
+        # Log kết quả từ ZaloPay
+        print(f"ZaloPay API response: {result}")
+
+        if result.get('return_code') != 1:
+            return jsonify({'error': 'Không thể tạo đơn hàng', 'details': result.get('return_message')}), 500
+        
+        return jsonify({
+            'order_url': result.get('order_url'),
+            'app_trans_id': app_trans_id
+        })
+    
+    except Exception as e:
+        print(f"[LỖI] Tạo đơn hàng ZaloPay: {str(e)}")
+        return jsonify({'error': 'Lỗi khi tạo đơn hàng', 'details': str(e)}), 500
+
+
+
+# Route xử lý callback từ ZaloPay
+@app.route('/callback', methods=['POST'])
+def callback():
+    result = {}
+    try:
+        cbdata = request.json
+
+        # Log dữ liệu callback nhận được
+        print(f"Callback data: {cbdata}")
+        
+        mac = hmac.new(config['zalopay_key2'].encode(), cbdata['data'].encode(), hashlib.sha256).hexdigest()
+        
+        if mac != cbdata['mac']:
+            result['return_code'] = -1
+            result['return_message'] = 'mac not equal'
+            return jsonify(result)
+
+        data_json = json.loads(cbdata['data'])
+        app_trans_id = data_json['app_trans_id']
+        embed_data = json.loads(data_json['embed_data'])
+        user_id = embed_data['user_id']
+        coin = embed_data['coin']
+        
+        # Log dữ liệu đã giải mã
+        print(f"Decoded callback data: app_trans_id = {app_trans_id}, user_id = {user_id}, coin = {coin}")
+        
+        with app.app_context():
+            user = User.query.get(user_id)
+            if not user:
+                result['return_code'] = 0
+                result['return_message'] = 'Không tìm thấy người dùng'
+                return jsonify(result)
+            
+            user.coin += coin
+            transaction = Transaction(
+                user_id=user_id,
+                type='recharge_zalopay',
+                amount=coin
+            )
+            db.session.add(transaction)
+            db.session.commit()
+
+        print(f"Đã nạp {coin} xu cho user_id {user_id}, app_trans_id = {app_trans_id}")
+
+        result['return_code'] = 1
+        result['return_message'] = 'success'
+    except Exception as e:
+        print(f"[LỖI] Callback ZaloPay: {str(e)}")
+        result['return_code'] = 0
+        result['return_message'] = str(e)
+    return jsonify(result)
+
+
+# Route chuyển hướng sau thanh toán
+@app.route('/success')
+def payment_success():
+    return jsonify({'message': 'Thanh toán thành công, xu đã được cộng vào tài khoản!'})
+
 
 
 if __name__ == '__main__':
