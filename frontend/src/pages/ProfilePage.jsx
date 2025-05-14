@@ -11,6 +11,10 @@ import {
   InputAdornment,
   Avatar,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import {
   Person,
@@ -35,6 +39,11 @@ const ProfilePage = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
   const coin = userData.coin || 0;
+  // State cho dialog nạp coin
+  const [openNapCoin, setOpenNapCoin] = useState(false);
+
+  // Tỷ lệ cố định: 10,000 VNĐ = 50 xu
+  const FIXED_RATE = { amount: 10000, coin: 50 };
 
   // Lấy chữ cái đầu tiên của username làm avatar
   const avatarInitial = username ? username[0].toUpperCase() : "?";
@@ -91,8 +100,45 @@ const ProfilePage = () => {
   };
 
   const handleNapCoin = () => {
-    setSuccessMessage("Tính năng nạp coin đang được phát triển!");
-    setSuccessOpen(true);
+    setOpenNapCoin(true); // Mở dialog nạp coin
+  };
+
+  const handleNapCoinSubmit = async () => {
+    setLoading(true);
+    try {
+      const payload = {
+        user_id: userData.userId,
+        amount: FIXED_RATE.amount,
+        coin: FIXED_RATE.coin,
+      };
+
+      console.log("Sending nap coin data:", payload);
+
+      const response = await fetch("http://localhost:5000/api/create-zalopay-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (data.order_url) {
+        window.location.href = data.order_url; // Chuyển hướng đến ZaloPay
+      } else {
+        throw new Error(data.error || "Không thể tạo đơn hàng");
+      }
+    } catch (err) {
+      console.error("Nap coin error:", err);
+      setSuccessMessage(`Nạp coin thất bại: ${err.message}`);
+      setSuccessOpen(true);
+    } finally {
+      setLoading(false);
+      setOpenNapCoin(false);
+    }
+  };
+
+  const handleNapCoinClose = () => {
+    setOpenNapCoin(false);
   };
 
   const handleLogout = () => {
@@ -357,7 +403,6 @@ const ProfilePage = () => {
                 boxShadow: "0 0 25px rgba(255, 107, 107, 0.7)",
               },
             }}
- InnoDB
           >
             Đăng Xuất
           </Button>
@@ -366,6 +411,61 @@ const ProfilePage = () => {
             {theme === "dark" ? <Brightness7 /> : <Brightness4 />}
           </IconButton>
         </Box>
+
+        {/* Dialog nạp coin */}
+        <Dialog
+          open={openNapCoin}
+          onClose={handleNapCoinClose}
+          sx={{
+            "& .MuiDialog-paper": {
+              background: "linear-gradient(145deg, #25253a, #35354a)",
+              borderRadius: "15px",
+              boxShadow: "0 0 25px rgba(160, 160, 255, 0.3)",
+              color: "white",
+            },
+          }}
+        >
+          <DialogTitle sx={{ fontFamily: '"Orbitron", sans-serif', color: "#a0a0ff" }}>
+            Nạp Coin bằng ZaloPay
+          </DialogTitle>
+          <DialogContent>
+            <Typography
+              sx={{
+                mb: 2,
+                color: "#a0a0ff",
+                fontFamily: '"Roboto", sans-serif',
+              }}
+            >
+              Nạp 10,000 VNĐ để nhận 50 xu
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={handleNapCoinClose}
+              sx={{ color: "#ff6b6b", fontFamily: '"Roboto", sans-serif' }}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleNapCoinSubmit}
+              disabled={loading}
+              sx={{
+                color: "white",
+                background: "linear-gradient(90deg, #ffd700, #ffaa00)",
+                fontWeight: 600,
+                borderRadius: "15px",
+                "&:hover": {
+                  background: "linear-gradient(90deg, #ffaa00, #ffd700)",
+                },
+                "&:disabled": {
+                  background: "rgba(255, 215, 0, 0.5)",
+                },
+              }}
+            >
+              {loading ? <CircularProgress size={24} sx={{ color: "white" }} /> : "Nạp"}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Snackbar
           open={successOpen}
