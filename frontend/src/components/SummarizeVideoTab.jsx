@@ -238,7 +238,7 @@ const SummarizeVideoTab = ({
                           <Delete fontSize="small" />
                         </IconButton>
                       </Box>
-                      <Typography variant="h6">Nội dung chuyển từ âm thanh:</Typography>
+                      <Typography variant="h6">Nội dung trích xuất từ video:</Typography>
                       <Typography variant="body1" sx={{ whiteSpace: "pre-line", mt: 1 }}>{transcript}</Typography>
                     </Box>
                   )}
