@@ -228,7 +228,7 @@ const Login = () => {
                 </InputAdornment>
               ),
               sx: {
-                background: 'linear-gradient(145deg, #3e3e3e, #4e4e5e)',
+                background: 'linear-gradient(155deg, #3e3e3e, #4e4e5e)',
                 color: 'white',
                 borderRadius: '15px',
                 padding: '10px',
