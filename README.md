@@ -28,10 +28,10 @@ Trích xuất nội dung ⟶ NLP model ⟶ Tóm tắt
 
 ```
 HAUSummarize/
-├── frontend/           # Giao diện người dùng (React)
-├── backend/            # Flask API xử lý tóm tắt
-├── models/             # Mô hình huấn luyện
-├── data/               # Tập dữ liệu văn bản & video
+├── frontend/                    # Giao diện người dùng (React)
+├── backend/                     # Flask API xử lý tóm tắt
+├── text_summarization_model/    # Mô hình huấn luyện
+├── data/                        # Tập dữ liệu văn bản & video
 ├── README.md
 └── requirements.txt
 ```
