@@ -46,9 +46,9 @@ cd HAUSummarize
 ```
 
 ### 2. Cài đặt backend
-
+## cài đặt python 3.10
 ```bash
-venv venv\Scripts\activate
+py -3.10 -m pip install -r requirements.txt
 python app.py
 ```
 
