@@ -57,7 +57,7 @@ python app.py
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev
 ```
 
 ### 4. Truy cập web
