@@ -987,13 +987,10 @@ def callback():
 def payment_success():
     return jsonify({'message': 'Thanh toán thành công, xu đã được cộng vào tài khoản!'})
 
-
-
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         create_admin()
-    app.run(debug=True)
     
-    
-    
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
