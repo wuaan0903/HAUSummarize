@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: hausummarize-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    runtime: python3.10
+    region: oregon  # hoặc: frankfurt, singapore,...
+    plan: free
