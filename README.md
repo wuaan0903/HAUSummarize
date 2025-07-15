@@ -81,19 +81,9 @@ Mở trình duyệt và truy cập: [http://localhost:5173](http://localhost:517
 - [ ] Cải thiện độ chính xác và tối ưu mô hình.
 - [ ] Hỗ trợ tóm tắt theo ngữ cảnh (context-aware).
 
-## 🤝 Đóng góp
-
-Rất hoan nghênh mọi đóng góp! Bạn có thể:
-
-1. Fork dự án
-2. Tạo nhánh mới (`git checkout -b feature/ten-chuc-nang`)
-3. Commit thay đổi (`git commit -m 'Thêm tính năng XYZ'`)
-4. Push lên nhánh của bạn (`git push origin feature/ten-chuc-nang`)
-5. Tạo pull request
-
 ## 📬 Liên hệ
 
-- **Nhóm Tác giả:** Nguyễn Minh Quân
+- **Nhóm Tác giả:** Nguyễn Minh Quân,
                     Lại Hoàng Tú
 - **Email:** [nminhquan933@gmail.com]
              [penmoding@gmail.com]
